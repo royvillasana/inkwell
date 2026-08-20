@@ -34,6 +34,8 @@
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --pad:clamp(20px,5vw,56px);
   --round:clamp(28px,4vw,52px);
+  /* distance from the content column to the window edge, for full-bleed pieces */
+  --gutter:max(0px,(100vw - min(1180px,100vw - 2*clamp(20px,5vw,56px))) / 2);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
@@ -208,7 +210,7 @@ nav .get:hover{background:#000}
 .card code{font-family:var(--mono);font-size:.86em;background:rgba(0,0,0,.05);padding:1px 5px;border-radius:5px}
 
 /* ---------- split section (headline + pills + shot) ---------- */
-.split{display:grid;gap:clamp(36px,5vw,72px);grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);align-items:center}
+.split{display:grid;gap:clamp(32px,4vw,56px);grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);align-items:center}
 @media (max-width:900px){.split{grid-template-columns:1fr}}
 .pills{display:flex;flex-direction:column;gap:8px;margin-top:34px;align-items:flex-start}
 .pill{
@@ -221,6 +223,17 @@ nav .get:hover{background:#000}
 .shot{
   border-radius:clamp(14px,1.4vw,20px);overflow:hidden;border:1px solid rgba(255,255,255,.09);
   box-shadow:0 40px 90px -30px rgba(0,0,0,.8)
+}
+/* Run the diagram shot out to the right edge of the window so it reads at a
+   useful size — the panel clips, so this never adds a horizontal scrollbar. */
+@media (min-width:1000px){
+  /* stop exactly at the window edge: percentages here resolve against the grid
+     column, not the page, which overshot and clipped the diagram */
+  .split .shot{
+    margin-right:calc(-1 * var(--gutter));
+    border-radius:clamp(14px,1.4vw,20px) 0 0 clamp(14px,1.4vw,20px);
+    border-right:0
+  }
 }
 
 /* ---------- builds ---------- */
