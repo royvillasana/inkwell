@@ -70,7 +70,7 @@ nav{
 nav .name{display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:-.02em}
 nav .name img{width:20px;height:20px;border-radius:6px}
 nav .links{display:flex;align-items:center;gap:4px;margin-left:10px}
-nav .links a{padding:7px 12px;border-radius:999px;color:var(--p-soft);font-weight:500;transition:.15s}
+nav .links a{padding:7px 12px;border-radius:999px;color:var(--p-soft);font-weight:500;transition:.15s;white-space:nowrap}
 nav .links a:hover{background:rgba(0,0,0,.06);color:var(--p-ink)}
 nav .get{
   padding:8px 16px;border-radius:999px;background:var(--p-ink);color:var(--p-page);
@@ -78,6 +78,13 @@ nav .get{
 }
 nav .get:hover{background:#000}
 @media (max-width:720px){nav .links a.opt{display:none}}
+@media (max-width:460px){
+  /* with the links gone the wordmark and the button crowd each other, so let
+     the pill span the width and push them to opposite ends */
+  nav .links{display:none}
+  nav{width:calc(100% - 32px);padding-right:6px}
+  nav .get{margin-left:auto}
+}
 
 /* ---------- buttons ---------- */
 .btn{
@@ -153,7 +160,7 @@ nav .get:hover{background:#000}
 .panel-night .lede{color:var(--n-soft)}
 
 /* ---------- feature cards ---------- */
-.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(268px,1fr))}
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 .card{
   background:var(--p-page);border-radius:22px;padding:30px 28px 32px;
   display:flex;flex-direction:column;gap:11px
@@ -221,8 +228,15 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 
 @media (max-width:640px){
   .hero{padding-top:132px}
-  .stage-inner{transform:none}
+  /* the shot shrank to an illegible smudge at this width; let it bleed off the
+     right edge instead, so the part you can see is readable */
+  .stage{padding-inline:0;overflow:clip}
+  .stage-inner{
+    transform:none;width:190%;max-width:none;margin-left:var(--pad);
+    border-radius:14px 0 0 0;border-right:0
+  }
   .gate{grid-template-columns:1fr}
+  .hero-cta .btn{width:100%}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
