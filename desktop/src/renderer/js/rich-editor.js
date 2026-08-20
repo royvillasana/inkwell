@@ -18,6 +18,7 @@ let editor = null;
 let host = null;
 let onChange = null;
 let bubble = null;
+let floater = null;
 
 export const isReady = () => !!editor;
 /* the underlying TipTap instance, for callers that need ProseMirror directly */
@@ -41,6 +42,7 @@ export async function open(container, markdown, opts = {}){
   container.textContent = "";
   container.appendChild(holder);
   buildBubble(container);
+  buildFloater(container);
 
   editor = new lib.Editor({
     element: holder,
@@ -62,11 +64,16 @@ export async function open(container, markdown, opts = {}){
       lib.TableRow, lib.TableHeader, lib.TableCell,
       lib.TaskList,
       lib.TaskItem.configure({ nested: true }),
-      lib.Placeholder.configure({ placeholder: "Write something…" })
+      lib.Placeholder.configure({
+        placeholder: "Write something, or pick a block below",
+        showOnlyCurrent: true,
+        includeChildren: false
+      })
     ],
-    onUpdate: () => { if (onChange) onChange(); },
-    onSelectionUpdate: () => placeBubble(),
-    onBlur: () => hideBubble()
+    onUpdate: () => { if (onChange) onChange(); placeFloater(); },
+    onSelectionUpdate: () => { placeBubble(); placeFloater(); },
+    onFocus: () => placeFloater(),
+    onBlur: () => { hideBubble(); hideFloater(); }
   });
 
   /* links open in the real browser rather than navigating the app */
@@ -83,6 +90,7 @@ export async function open(container, markdown, opts = {}){
 
 export function close(){
   hideBubble();
+  hideFloater();
   if (editor) { editor.destroy(); editor = null; }
 }
 
@@ -265,7 +273,7 @@ let linkAsker = null;
 export const setLinkAsker = fn => { linkAsker = fn; };
 async function askLink(prev){
   if (!linkAsker) return;
-  const href = await linkAsker(prev);
+  const href = await linkAsker(prev, { title: "Link", label: "URL", ok: "Apply" });
   if (href == null) return;
   if (!href) editor.chain().focus().unsetLink().run();
   else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
@@ -304,6 +312,101 @@ function placeBubble(){
   });
 }
 function hideBubble(){ if (bubble) bubble.classList.remove("on"); }
+
+/* ---- floating menu -------------------------------------------------------
+   TipTap's third menu shape: where the bubble menu acts on a SELECTION, this
+   one offers blocks to insert, and shows whenever the caret sits on an empty
+   line. It is the discovery path for everything the syntax used to announce. */
+const ICON = {
+  h1:'<path d="M4 5v14M12 5v14M4 12h8"/><path d="M17 9.5 19.5 8V19"/>',
+  h2:'<path d="M4 5v14M11 5v14M4 12h7"/><path d="M15.5 9.2a2.4 2.4 0 1 1 3.9 2.5L15.5 19h4.4"/>',
+  bullet:'<circle cx="4.6" cy="7" r="1.3"/><circle cx="4.6" cy="12" r="1.3"/><circle cx="4.6" cy="17" r="1.3"/><path d="M9 7h11M9 12h11M9 17h11"/>',
+  task:'<rect x="3" y="4.6" width="6" height="6" rx="1.6"/><path d="M4.4 7.6 5.7 8.9 8 6.4"/><rect x="3" y="13.4" width="6" height="6" rx="1.6"/><path d="M12.5 7.6H21M12.5 16.4H21"/>',
+  quote:'<path d="M7.5 6.5C5.6 7.6 4.5 9.4 4.5 11.6c0 2 1.2 3.4 2.9 3.4 1.5 0 2.6-1.1 2.6-2.6 0-1.4-1-2.5-2.4-2.5-.3 0-.5 0-.7.1.2-1 .9-2 2-2.7zM17 6.5c-1.9 1.1-3 2.9-3 5.1 0 2 1.2 3.4 2.9 3.4 1.5 0 2.6-1.1 2.6-2.6 0-1.4-1-2.5-2.4-2.5-.3 0-.5 0-.7.1.2-1 .9-2 2-2.7z"/>',
+  code:'<path d="M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5"/>',
+  table:'<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 10h18M9.5 10v9.5M15.5 10v9.5"/>',
+  math:'<path d="M5 5h11l-6.5 7L16 19H5"/><path d="M19.5 5v14"/>',
+  diagram:'<rect x="3" y="3.5" width="7" height="5.5" rx="1.5"/><rect x="14" y="15" width="7" height="5.5" rx="1.5"/><path d="M6.5 9v4a2 2 0 0 0 2 2H14"/>',
+  image:'<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>',
+  rule:'<path d="M3 12h18"/>'
+};
+
+const FLOAT_ITEMS = [
+  { key: "h1",      title: "Heading 1",      run: () => command("heading", 1) },
+  { key: "h2",      title: "Heading 2",      run: () => command("heading", 2) },
+  { key: "bullet",  title: "Bullet list",    run: () => command("bullet") },
+  { key: "task",    title: "Task list",      run: () => command("task") },
+  { key: "quote",   title: "Quote",          run: () => command("quote") },
+  { key: "code",    title: "Code block",     run: () => command("codeblock") },
+  { key: "table",   title: "Table",          run: () => command("table") },
+  { key: "math",    title: "Maths block",    run: () => insertFenced("math") },
+  { key: "diagram", title: "Diagram",        run: () => insertFenced("mermaid") },
+  { key: "image",   title: "Image",          run: () => askImage() },
+  { key: "rule",    title: "Divider",        run: () => command("hr") }
+];
+
+function svg(key){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+         'stroke-linecap="round" stroke-linejoin="round">' + ICON[key] + "</svg>";
+}
+
+function buildFloater(container){
+  if (floater && floater.isConnected) return;
+  floater = document.createElement("div");
+  floater.id = "rich-floating";
+  FLOAT_ITEMS.forEach(it => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.title = it.title;
+    b.setAttribute("aria-label", it.title);
+    b.innerHTML = svg(it.key);
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => { it.run(); placeFloater(); };
+    floater.appendChild(b);
+  });
+  (container.closest("#main") || document.body).appendChild(floater);
+}
+
+/* a fenced block with a language, which the block editor renders on the way out */
+function insertFenced(lang){
+  if (!editor) return;
+  editor.chain().focus().insertContent({
+    type: "codeBlock",
+    attrs: { language: lang },
+    content: [{ type: "text", text: lang === "mermaid" ? "graph TD\n  A[Start] --> B[End]" : "E = mc^2" }]
+  }).run();
+}
+
+async function askImage(){
+  if (!linkAsker || !editor) return;
+  const src = await linkAsker("", { title: "Image", label: "Image URL or path", ok: "Insert" });
+  if (src) command("image", src);
+}
+
+/* Shown when the caret sits on an empty block — the moment there is nothing to
+   format and everything to insert. */
+function placeFloater(){
+  if (!editor || !floater) return hideFloater();
+  const { state } = editor;
+  const { empty, $from } = state.selection;
+  const node = $from.parent;
+  const onEmptyBlock = empty
+    && node.isTextblock
+    && node.content.size === 0
+    && node.type.name !== "codeBlock";
+
+  if (!onEmptyBlock || !editor.isFocused) return hideFloater();
+
+  const at = editor.view.coordsAtPos($from.pos);
+  floater.classList.add("on");
+  const w = floater.offsetWidth || 380;
+  const left = Math.min(at.left, window.innerWidth - w - 16);
+  floater.style.left = Math.max(12, left) + "px";
+  floater.style.top = Math.min(at.bottom + 9, window.innerHeight - floater.offsetHeight - 12) + "px";
+}
+function hideFloater(){ if (floater) floater.classList.remove("on"); }
+
+export const floatingMenuVisible = () => !!(floater && floater.classList.contains("on"));
 
 /* ---- commands the app's menus drive ------------------------------------- */
 export function command(name, arg){

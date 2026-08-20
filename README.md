@@ -77,12 +77,14 @@ downloads: `npm approve-scripts electron`.
 
 ### What the desktop build adds
 
-- **Rich text mode** (`⇧⌘R`) — a full WYSIWYG surface built on
+- **Rich text mode** (`⌘R`) — a full WYSIWYG surface built on
   [TipTap](https://tiptap.dev) / ProseMirror, over the same markdown file.
   Markdown syntax never appears; formatting applies to the selection through a
   floating bubble menu, tables resize by dragging, and the document is written
-  back out as plain markdown when you leave. The block editor and rich mode are
-  two views of one file — switch freely.
+  back out as plain markdown when you leave. Two menus follow the caret: a
+  bubble menu over a selection, and a floating insert menu on an empty line —
+  headings, lists, quotes, code, tables, maths, diagrams, images and rules.
+  The block editor and rich mode are two views of one file — switch freely.
 - **Vaults.** Open a folder and get a real tree with nested directories, plus
   create, rename, reveal and move-to-trash from the context menu.
 - **Search across every note**, with case, whole-word and regex switches, line
@@ -176,8 +178,8 @@ purpose. ✓ = done, ~ = partial, ✗ = not yet.
 
 | Typora feature | Light | Desktop | Note |
 | --- | :---: | :---: | --- |
-| Live preview while typing | ~ | ✓ | Light: source shows for the focused **block**. Desktop adds a true inline WYSIWYG via TipTap (`⇧⌘R`) |
-| Selection formatting toolbar | ✗ | ✓ | Floating bubble menu in rich text mode |
+| Live preview while typing | ~ | ✓ | Light: source shows for the focused **block**. Desktop adds a true inline WYSIWYG via TipTap (`⌘R`) |
+| Selection formatting toolbar | ✗ | ✓ | Bubble menu on a selection, insert menu on an empty line |
 | Drag to resize table columns | ✗ | ✓ | In rich text mode |
 | Auto-pair brackets and quotes | ✓ | ✓ | |
 | Smart quotes, dashes, ellipses | ✗ | ✓ | Toggle in preferences |

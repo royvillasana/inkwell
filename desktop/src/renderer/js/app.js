@@ -235,8 +235,12 @@ function scheduleAutosave(){
       $("#st-saved").textContent = "autosaved " + fmtTime(Date.now());
       renderTabs();
       markTitle();
-      if (wasActive != null) { /* keep the caret where it was */ }
-    } catch (err) { $("#st-saved").textContent = "autosave failed"; }
+    } catch (err) {
+      /* say what went wrong rather than a bare "failed" — a silent lie here
+         would have people believing their work is not being written */
+      console.error("autosave:", err);
+      $("#st-saved").textContent = "autosave failed: " + (err.message || "unknown");
+    }
   }, Math.max(400, prefs.autosaveDelay));
 }
 
@@ -463,8 +467,10 @@ async function toggleRich(){
         spellcheck: prefs.spellcheck,
         onChange: () => { state.dirty = true; updateStatus(); scheduleAutosave(); }
       });
-      Rich9.setLinkAsker(prev => askText("Where should this link point?", prev,
-        { title: "Link", label: "URL", ok: "Apply", placeholder: "https://" }));
+      Rich9.setLinkAsker((prev, opts) => askText(
+        (opts && opts.title === "Image") ? "Where is the image?" : "Where should this link point?",
+        prev,
+        Object.assign({ title: "Link", label: "URL", ok: "Apply", placeholder: "https://" }, opts || {})));
     } catch (err) {
       prefs.rich = false;
       document.body.classList.remove("mode-rich");
@@ -812,7 +818,7 @@ const COMMANDS = [
   { name: "Search the vault", key: "⇧⌘F", run: () => { toggleSidebar(true); setPane("search"); } },
   { name: "Find & replace", key: "⌘F", run: () => openFind(true) },
   { name: "Source mode", key: "⌘/", run: () => toggleSource() },
-  { name: "Rich text mode", key: "⇧⌘R", run: () => toggleRich() },
+  { name: "Rich text mode", key: "⌘R", run: () => toggleRich() },
   { name: "Split view", key: "⇧⌘E", run: () => toggleSplit() },
   { name: "Focus mode", key: "⇧⌘F", run: () => toggleFocus() },
   { name: "Typewriter mode", key: "", run: () => toggleTypewriter() },
@@ -1249,7 +1255,6 @@ function wireUI(){
     const k = e.key.toLowerCase();
     if (e.shiftKey && k === "p") { e.preventDefault(); $("#palette").classList.contains("on") ? closePalette() : openPalette("commands"); }
     else if (e.shiftKey && k === "k") { e.preventDefault(); quickOpen(); }
-    else if (e.shiftKey && k === "r") { e.preventDefault(); toggleRich(); }
     else if (k === "," ) { e.preventDefault(); settingsDialog(); }
     else if (k === "\\") { e.preventDefault(); toggleSidebar(); }
     else if (e.key === "Tab") { e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1); }

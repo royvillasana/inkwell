@@ -1,0 +1,18 @@
+# Meeting Notes
+
+Tuesday, with the whole team.
+
+## Decisions
+
+1.  Ship the editor first, the sync layer later
+2.  Keep files on disk in plain markdown
+3.  Revisit [Typography](#) before the beta
+
+```mermaid
+graph LR
+  A[Draft] --> B{Review}
+  B -->|approved| C[Ship]
+  B -->|changes| A
+```
+
+Follow-ups are tagged [#project](#) so they turn up in search.

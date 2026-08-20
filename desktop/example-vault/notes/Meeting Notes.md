@@ -1,18 +1,8 @@
-# Meeting Notes
+# Field Notes
 
-Tuesday, with the whole team.
+Rich text mode puts **TipTap** over the same markdown file. Select text and the formatting bubble appears; land on an empty line and the insert menu does.
 
-## Decisions
+## What it inserts
 
-1. Ship the editor first, the sync layer later
-2. Keep files on disk in plain markdown
-3. Revisit [[Typography]] before the beta
-
-```mermaid
-graph LR
-  A[Draft] --> B{Review}
-  B -->|approved| C[Ship]
-  B -->|changes| A
-```
-
-Follow-ups are tagged #project so they turn up in search.
+- [x] Headings, lists and quotes
+- [ ] Tables, code, maths and diagrams

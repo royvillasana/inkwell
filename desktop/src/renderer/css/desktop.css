@@ -175,3 +175,24 @@ body.mode-rich #richwrap{display:block}
 #rich-bubble button:hover{background:var(--panel-2);color:var(--ink)}
 #rich-bubble button.on{background:var(--accent-soft);color:var(--accent)}
 #rich-bubble .sep{width:1px;height:17px;background:var(--rule);margin:0 4px}
+
+/* ---------- Floating insert menu (rich text mode) ---------- */
+#rich-floating{
+  position:fixed;z-index:60;display:none;align-items:center;gap:2px;padding:5px;
+  background:var(--panel);border:1px solid var(--rule);border-radius:12px;
+  box-shadow:var(--shadow);font-family:var(--font-ui)
+}
+#rich-floating.on{display:flex}
+#rich-floating button{
+  display:grid;place-items:center;width:30px;height:30px;border-radius:8px;
+  color:var(--ink-faint);transition:background var(--speed),color var(--speed)
+}
+#rich-floating button svg{width:17px;height:17px}
+#rich-floating button:hover{background:var(--accent-soft);color:var(--accent)}
+#rich-floating button:active{transform:translateY(.5px)}
+
+/* the empty line the menu belongs to gets its own prompt */
+.rich-surface p.is-empty::before{
+  content:attr(data-placeholder);float:left;height:0;pointer-events:none;
+  color:var(--ink-faint);opacity:.75
+}
