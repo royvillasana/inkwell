@@ -2356,6 +2356,15 @@ const WELCOME = [
  try {
   try { Object.assign(prefs, JSON.parse(LS.get("inkwell:prefs") || "{}")); } catch (err) {}
   setTheme(prefs.theme || "paper");
+
+  /* #theme=night lets a page that embeds this file match its own colours,
+     without overwriting whatever theme this visitor chose for themselves */
+  const wanted = new URLSearchParams(location.hash.slice(1)).get("theme");
+  if (wanted && ["paper", "sepia", "night", "slate"].includes(wanted)) {
+    prefs.theme = wanted;
+    document.documentElement.dataset.theme = wanted;
+    $$(".theme-dot").forEach(d => d.classList.toggle("on", d.dataset.theme === wanted));
+  }
   toggleSidebar(prefs.sidebar !== false);
   if (prefs.focus)      { prefs.focus = false; toggleFocus(); }
   if (prefs.typewriter) { prefs.typewriter = false; toggleTypewriter(); }

@@ -42,7 +42,10 @@ body{
   font-family:var(--display);font-size:17px;line-height:1.6;
   font-optical-sizing:auto;-webkit-font-smoothing:antialiased;
 }
-img{max-width:100%;display:block}
+/* height:auto is load-bearing: the <img> tags carry width/height attributes for
+   layout stability, and without it the attribute height wins while CSS scales
+   the width — which stretched both screenshots badly. */
+img{max-width:100%;height:auto;display:block}
 a{color:inherit;text-decoration:none}
 .wrap{width:min(1180px,100% - 2*var(--pad));margin-inline:auto}
 
@@ -124,19 +127,54 @@ nav .get:hover{background:#000}
 .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:38px}
 .hero-note{margin-top:18px;font-size:13.5px;color:var(--n-faint)}
 
-/* the app shot, bleeding off the bottom of the hero */
-.stage{position:relative;margin-top:64px;padding-inline:var(--pad)}
-.stage-inner{
-  position:relative;width:min(1240px,100%);margin-inline:auto;
-  border-radius:clamp(14px,1.6vw,22px);overflow:hidden;
-  border:1px solid rgba(255,255,255,.09);
-  box-shadow:0 -1px 0 rgba(255,255,255,.06) inset,0 50px 120px -30px rgba(0,0,0,.85);
-  transform:perspective(2200px) rotateX(2.6deg);transform-origin:top center
+/* the editor itself, sitting in an app window */
+.stage{position:relative;margin-top:64px;padding-inline:var(--pad);padding-bottom:clamp(40px,6vw,86px)}
+.appwin{
+  position:relative;width:min(1240px,100%);margin:0 auto;
+  border-radius:clamp(12px,1.4vw,18px);overflow:hidden;
+  border:1px solid rgba(255,255,255,.10);background:var(--n-panel);
+  box-shadow:0 -1px 0 rgba(255,255,255,.06) inset,0 50px 120px -30px rgba(0,0,0,.85)
 }
-.stage-inner img{width:100%}
-.stage-fade{
-  position:absolute;left:0;right:0;bottom:0;height:34%;
-  background:linear-gradient(transparent,var(--n-bg));pointer-events:none
+.appwin-bar{
+  display:flex;align-items:center;gap:12px;height:36px;padding:0 14px;
+  background:var(--n-panel);border-bottom:1px solid var(--n-rule)
+}
+.lights{display:flex;gap:7px;flex:0 0 auto}
+.lights i{width:11px;height:11px;border-radius:50%;background:#3a3f47}
+.lights i:nth-child(1){background:#e0655f}
+.lights i:nth-child(2){background:#e3b34c}
+.lights i:nth-child(3){background:#5cb85c}
+.appwin-title{
+  flex:1;text-align:center;font-size:12.5px;color:var(--n-faint);
+  margin-right:46px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.appwin-body{position:relative;aspect-ratio:2360/1640;background:var(--n-bg)}
+.appwin-body > iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.appwin-shot{width:100%;height:auto;display:block}
+
+/* Until you ask for it, the embed is inert — so scrolling past the hero never
+   gets captured by an editor you did not mean to click into. */
+.appwin-veil{
+  position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:34px;background:linear-gradient(transparent 45%,rgba(11,12,14,.72));
+  cursor:pointer;transition:opacity .25s;border:0
+}
+.appwin-veil[hidden]{display:none}
+.appwin.live .appwin-veil{opacity:0;pointer-events:none}
+.veil-label{
+  display:inline-flex;align-items:center;gap:9px;padding:11px 20px;border-radius:999px;
+  background:rgba(255,254,251,.94);color:var(--p-ink);font-size:14.5px;font-weight:600;
+  box-shadow:0 10px 30px rgba(0,0,0,.4)
+}
+.pulse{
+  position:absolute;top:50%;left:50%;width:74px;height:74px;margin:-37px 0 0 -37px;
+  border-radius:50%;border:1px solid rgba(224,160,106,.5);
+  animation:pulse 2.6s ease-out infinite
+}
+@keyframes pulse{
+  0%{transform:scale(.7);opacity:0}
+  40%{opacity:.9}
+  100%{transform:scale(1.5);opacity:0}
 }
 
 /* ---------- panels ---------- */
@@ -231,9 +269,9 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
   /* the shot shrank to an illegible smudge at this width; let it bleed off the
      right edge instead, so the part you can see is readable */
   .stage{padding-inline:0;overflow:clip}
-  .stage-inner{
-    transform:none;width:190%;max-width:none;margin-left:var(--pad);
-    border-radius:14px 0 0 0;border-right:0
+  .appwin{
+    width:190%;max-width:none;margin-left:var(--pad);
+    border-radius:12px 0 0 0;border-right:0
   }
   .gate{grid-template-columns:1fr}
   .hero-cta .btn{width:100%}
@@ -273,10 +311,23 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
   </div>
 
   <div class="stage">
-    <div class="stage-inner">
-      <img src="assets/screenshot.png" alt="Inkwell with a vault open: file tree on the left, a rendered note in the centre" width="2360" height="1640">
-      <div class="stage-fade"></div>
-    </div>
+    <figure class="appwin" id="demo-window">
+      <figcaption class="appwin-bar">
+        <span class="lights"><i></i><i></i><i></i></span>
+        <span class="appwin-title">Inkwell — running in your browser</span>
+      </figcaption>
+      <div class="appwin-body" id="demo-body">
+        <!-- On a wide screen this is filled with the real editor; on a phone it
+             stays a screenshot, because a 390px editor is no advertisement. -->
+        <img class="appwin-shot" src="assets/screenshot.png"
+             alt="Inkwell with a vault open: file tree on the left, a rendered note in the centre"
+             width="2360" height="1640">
+        <button class="appwin-veil" id="demo-veil" type="button" hidden>
+          <span class="pulse"></span>
+          <span class="veil-label">This is the real editor — click to write in it</span>
+        </button>
+      </div>
+    </figure>
   </div>
 </header>
 
@@ -436,5 +487,52 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
   </div>
 </footer>
 
+<script>
+/* Swap the screenshot for the real editor once there is room for it. The light
+   build is one self-contained file, so this is the actual product running in
+   the page — not a video, not a mock. */
+(function () {
+  var win = document.getElementById("demo-window");
+  var body = document.getElementById("demo-body");
+  var veil = document.getElementById("demo-veil");
+  if (!win || !body || !veil) return;
+
+  var WIDE = 860;
+  var loaded = false;
+
+  function mount() {
+    if (loaded || window.innerWidth < WIDE) return;
+    if (window.matchMedia("(prefers-reduced-data: reduce)").matches) return;
+    loaded = true;
+    var frame = document.createElement("iframe");
+    frame.src = "try.html#theme=night";   /* match the page it sits in */
+    frame.title = "Inkwell running live";
+    frame.setAttribute("loading", "lazy");
+    frame.addEventListener("load", function () {
+      var shot = body.querySelector(".appwin-shot");
+      if (shot) shot.style.visibility = "hidden";
+      veil.hidden = false;
+    });
+    body.appendChild(frame);
+  }
+
+  veil.addEventListener("click", function () {
+    win.classList.add("live");
+    var frame = body.querySelector("iframe");
+    if (frame) frame.focus();
+  });
+
+  /* only bother once the hero is actually on screen */
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { mount(); io.disconnect(); } });
+    }, { rootMargin: "200px" });
+    io.observe(win);
+  } else {
+    mount();
+  }
+  window.addEventListener("resize", mount, { passive: true });
+})();
+</script>
 </body>
 </html>
