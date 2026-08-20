@@ -1,5 +1,7 @@
 # Inkwell
 
+**[Download for Mac](https://github.com/royvillasana/inkwell/releases/latest) · [Try it in your browser](https://royvillasana.github.io/inkwell/try.html) · [Website](https://royvillasana.github.io/inkwell/)**
+
 A markdown editor in the spirit of Typora: the block under your caret shows its
 markdown source, everything else shows finished, rendered prose.
 
@@ -56,6 +58,12 @@ Use it when you want to hand someone an editor as a single attachment.
 ---
 
 ## Desktop build
+
+Prebuilt: **[Inkwell-2.0.0-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+(macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
+app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
+
+From source:
 
 ```bash
 cd desktop
@@ -223,3 +231,24 @@ Without it, HTML, PDF, `.doc`, markdown and plain text still work.
 - In the **light** build, diagrams cover `graph TD/LR` only and LaTeX covers the
   common set. The desktop build has the real libraries and neither limit.
 - Raw HTML in a document is escaped and shown as text rather than executed.
+
+---
+
+## Releasing
+
+```bash
+cd desktop
+npm run vendor              # refresh src/renderer/vendor from node_modules
+npx electron scripts/icon.js  # regenerate build/icon.icns
+npm run test:all
+npm run dist:mac            # dist/Inkwell-<version>-arm64.dmg
+gh release create v<version> desktop/dist/*.dmg
+```
+
+The landing page lives in `docs/` and is served by GitHub Pages from `main`.
+`docs/try.html` is a copy of `Inkwell.html`, so refresh it when the light build
+changes:
+
+```bash
+cp Inkwell.html docs/try.html
+```

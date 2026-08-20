@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkwell — a quiet markdown editor</title>
+<meta name="description" content="A markdown editor in the spirit of Typora. The block under your caret shows its markdown source; everything else stays rendered. Free, open source, no accounts, no telemetry.">
+<link rel="icon" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="Inkwell — a quiet markdown editor">
+<meta property="og:description" content="Typora-style live preview, vaults, real Mermaid and real KaTeX. Free and open source.">
+<meta property="og:image" content="https://royvillasana.github.io/inkwell/assets/screenshot.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{
+  --bg:#131417; --panel:#1a1c20; --panel-2:#22252a; --page:#16181b;
+  --ink:#e8e6e1; --ink-soft:#a3a099; --ink-faint:#6f6c66;
+  --rule:#282b31; --accent:#e0a06a; --accent-deep:#c07f49; --accent-soft:#31261d;
+  --max:1080px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+section{padding:76px 0;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+h1,h2,h3{letter-spacing:-.022em;line-height:1.15;margin:0}
+h2{font-size:clamp(24px,3.4vw,34px);font-weight:680;margin-bottom:10px}
+.lede{color:var(--ink-soft);max-width:60ch;margin:0 0 34px}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+header .wrap{display:flex;align-items:center;gap:14px;height:60px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:640;font-size:16px;color:var(--ink)}
+.brand img{width:26px;height:26px;border-radius:7px}
+header nav{margin-left:auto;display:flex;gap:22px;align-items:center;font-size:14px}
+header nav a{color:var(--ink-soft)}
+header nav a:hover{color:var(--ink);text-decoration:none}
+@media (max-width:640px){header nav a.hide-sm{display:none}}
+
+/* ---------- hero ---------- */
+.hero{padding:86px 0 60px;text-align:center;position:relative;overflow:hidden}
+.hero::before{
+  content:"";position:absolute;left:50%;top:-320px;transform:translateX(-50%);
+  width:900px;height:620px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(224,160,106,.13),transparent 66%)
+}
+.hero h1{font-size:clamp(38px,6.4vw,66px);font-weight:720;margin-bottom:18px}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p.tag{font-family:var(--serif);font-size:clamp(17px,2.2vw,21px);color:var(--ink-soft);
+  max-width:56ch;margin:0 auto 34px;line-height:1.55}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.btn{
+  display:inline-flex;align-items:center;gap:9px;padding:13px 22px;border-radius:11px;
+  font-size:15px;font-weight:600;border:1px solid var(--rule);color:var(--ink);
+  transition:transform .12s ease,border-color .12s ease,background .12s ease
+}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-deep));
+  border-color:var(--accent-deep);color:#221a12}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn svg{width:17px;height:17px}
+.meta{font-size:13px;color:var(--ink-faint)}
+.meta code{font-family:var(--mono);font-size:11.5px;background:var(--panel);padding:2px 6px;
+  border-radius:5px;word-break:break-all}
+
+.shot{margin:52px auto 0;max-width:960px;padding:0 24px}
+.shot img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--rule);
+  box-shadow:0 30px 80px rgba(0,0,0,.5)}
+
+/* ---------- gatekeeper ---------- */
+.note{
+  display:flex;gap:14px;align-items:flex-start;max-width:660px;margin:26px auto 0;
+  background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:10px;padding:15px 17px;text-align:left;font-size:14px;color:var(--ink-soft)
+}
+.note b{color:var(--ink);font-weight:620}
+.note code{display:block;font-family:var(--mono);font-size:12.5px;background:var(--bg);
+  border-radius:6px;padding:8px 11px;margin-top:9px;color:var(--ink);overflow-x:auto}
+
+/* ---------- features ---------- */
+.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(248px,1fr))}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:13px;padding:22px}
+.card h3{font-size:16px;font-weight:640;margin-bottom:7px}
+.card p{margin:0;color:var(--ink-soft);font-size:14.5px}
+.card .ic{font-size:19px;margin-bottom:12px;display:block}
+
+/* ---------- builds ---------- */
+.builds{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.build{background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:26px;
+  display:flex;flex-direction:column}
+.build.featured{border-color:var(--accent-deep);background:linear-gradient(180deg,var(--accent-soft),var(--panel) 58%)}
+.build h3{font-size:19px;margin-bottom:4px}
+.build .sub{color:var(--ink-faint);font-size:13px;margin-bottom:16px}
+.build ul{list-style:none;padding:0;margin:0 0 22px;font-size:14.5px;color:var(--ink-soft)}
+.build li{padding:5px 0 5px 22px;position:relative}
+.build li::before{content:"›";position:absolute;left:4px;color:var(--accent);font-weight:700}
+.build .btn{align-self:flex-start;margin-top:auto}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:520px}
+th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--rule)}
+th{font-weight:620;color:var(--ink);background:var(--panel-2);font-size:13px;
+  text-transform:uppercase;letter-spacing:.05em}
+td:not(:first-child){text-align:center;width:130px}
+tr:last-child td{border-bottom:0}
+.yes{color:#6fbf87;font-weight:700}
+.no{color:var(--ink-faint)}
+
+footer{border-top:1px solid var(--rule);padding:40px 0 60px;color:var(--ink-faint);font-size:14px}
+footer .wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--ink-soft)}
+footer .right{margin-left:auto}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/icon.png" alt=""> Inkwell</a>
+    <nav>
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#builds">Builds</a>
+      <a href="try.html">Try it</a>
+      <a href="https://github.com/royvillasana/inkwell">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <h1>Write markdown that <em>looks finished</em></h1>
+    <p class="tag">The block under your caret shows its markdown source. Everything else stays
+      rendered. Click away and the syntax disappears again — that is the whole idea.</p>
+
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/royvillasana/inkwell/releases/download/v2.0.0/Inkwell-2.0.0-arm64.dmg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 12l5 5 5-5"/><path d="M4 20h16"/></svg>
+        Download for Mac
+      </a>
+      <a class="btn ghost" href="try.html">Try it in your browser</a>
+    </div>
+    <p class="meta">macOS 11+ · Apple Silicon · 116 MB · free and open source</p>
+
+    <div class="note">
+      <span>⚠️</span>
+      <div>
+        <b>First launch on macOS.</b> This build is not signed with an Apple Developer ID, so
+        Gatekeeper will block it. Drag Inkwell to Applications, then <b>right-click the app and
+        choose Open</b> — or clear the quarantine flag once:
+        <code>xattr -dr com.apple.quarantine /Applications/Inkwell.app</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="shot">
+    <img src="assets/screenshot.png" alt="Inkwell with a vault open, showing the file tree, outline and a rendered note" width="2360" height="1640">
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <p class="lede">Everything below works offline. No accounts, no telemetry, no network calls —
+      your notes are plain markdown files on your own disk.</p>
+
+    <div class="grid">
+      <div class="card">
+        <span class="ic">📁</span>
+        <h3>Vaults</h3>
+        <p>Open a folder and get a real file tree, search across every note, tags, and
+          <code>[[wiki links]]</code> that resolve — with backlinks showing what points here.</p>
+      </div>
+      <div class="card">
+        <span class="ic">⤳</span>
+        <h3>Real diagrams</h3>
+        <p>Mermaid is bundled, not approximated: flowchart, sequence, class, state, ER, gantt,
+          pie, journey, mindmap and gitGraph.</p>
+      </div>
+      <div class="card">
+        <span class="ic">∑</span>
+        <h3>Real maths</h3>
+        <p>KaTeX with the mhchem extension. Fractions, matrices, aligned environments and
+          chemistry all render as you type.</p>
+      </div>
+      <div class="card">
+        <span class="ic">⤓</span>
+        <h3>Export anywhere</h3>
+        <p>HTML, PDF, Word and plain text out of the box. Install Pandoc and docx, LaTeX, EPUB,
+          RTF, reStructuredText and MediaWiki appear too.</p>
+      </div>
+      <div class="card">
+        <span class="ic">⌘</span>
+        <h3>Fast to drive</h3>
+        <p>Command palette, quick open, slash menu for blocks, auto-pairing, table tools and
+          find-and-replace with regex.</p>
+      </div>
+      <div class="card">
+        <span class="ic">🕘</span>
+        <h3>Never lose work</h3>
+        <p>Autosave to disk, file watching with conflict prompts, and version history you can
+          walk back through — one snapshot per save.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Diagrams and equations, rendered inline</h2>
+    <p class="lede">Both libraries ship inside the app and load from disk, so a diagram renders
+      the same on a plane as it does at your desk.</p>
+    <div class="shot" style="margin:0;padding:0">
+      <img src="assets/diagrams.png" alt="A Mermaid sequence diagram and KaTeX equations rendered inside Inkwell" width="2360" height="1640">
+    </div>
+  </div>
+</section>
+
+<section id="builds">
+  <div class="wrap">
+    <h2>Two builds</h2>
+    <p class="lede">The same editor and the same markdown engine. They differ in what the
+      surrounding application is allowed to do.</p>
+
+    <div class="builds">
+      <div class="build featured">
+        <h3>Desktop</h3>
+        <div class="sub">Electron · macOS Apple Silicon</div>
+        <ul>
+          <li>Reads and writes real files</li>
+          <li>Vaults, search, backlinks</li>
+          <li>Real Mermaid and KaTeX</li>
+          <li>Pandoc export formats</li>
+          <li>Autosave and version history</li>
+          <li>Native menus, tabs, windows</li>
+        </ul>
+        <a class="btn primary" href="https://github.com/royvillasana/inkwell/releases/download/v2.0.0/Inkwell-2.0.0-arm64.dmg">Download the DMG</a>
+      </div>
+
+      <div class="build">
+        <h3>Light</h3>
+        <div class="sub">One HTML file · 155 KB · any browser</div>
+        <ul>
+          <li>The entire editor in one file</li>
+          <li>No install, no server, no build</li>
+          <li>Works straight from your disk</li>
+          <li>Saves back to file in Chrome and Edge</li>
+          <li>Email it to someone and it just works</li>
+          <li>Zero dependencies</li>
+        </ul>
+        <a class="btn ghost" href="try.html">Open it now</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Which one do I want?</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>&nbsp;</th><th>Light</th><th>Desktop</th></tr></thead>
+        <tbody>
+          <tr><td>Live block preview</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Tables, task lists, footnotes, <code>[TOC]</code></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Tabs, split view, presentation mode</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Full Mermaid diagram set</td><td class="no">partial</td><td class="yes">✓</td></tr>
+          <tr><td>Full LaTeX via KaTeX</td><td class="no">partial</td><td class="yes">✓</td></tr>
+          <tr><td>Folder of notes with search</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Backlinks across notes</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Autosave and file watching</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>docx, LaTeX, EPUB export</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Runs with no install</td><td class="yes">✓</td><td class="no">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Built to be inspected</h2>
+    <p class="lede">The markdown parser, the block editor, the maths fallback and the flowchart
+      renderer in the light build are all hand-written and readable. In the desktop app the
+      renderer runs sandboxed with context isolation on and a content-security policy that
+      allows scripts from the app itself only — it has no <code>require</code>, no
+      <code>fs</code>, and no direct IPC. Deletes go to the system Trash and saves are written
+      to a temp file and renamed, so a crash cannot truncate a note.</p>
+    <div class="cta" style="justify-content:flex-start">
+      <a class="btn ghost" href="https://github.com/royvillasana/inkwell">Read the source</a>
+      <a class="btn ghost" href="https://github.com/royvillasana/inkwell/releases">All releases</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Inkwell — MIT licensed</span>
+    <a href="https://github.com/royvillasana/inkwell">GitHub</a>
+    <a href="https://github.com/royvillasana/inkwell/issues">Report a problem</a>
+    <span class="right">Built by <a href="https://github.com/royvillasana">royvillasana</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
