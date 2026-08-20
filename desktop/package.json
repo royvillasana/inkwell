@@ -1,7 +1,7 @@
 {
   "name": "inkwell",
   "productName": "Inkwell",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A quiet markdown editor for the desktop",
   "main": "src/main/main.js",
   "author": "Roy Villasana",
@@ -127,7 +127,8 @@
     },
     "extraMetadata": {
       "main": "src/main/main.js"
-    }
+    },
+    "afterPack": "scripts/adhoc-sign.js"
   },
   "allowScripts": {
     "electron@43.4.1": true,

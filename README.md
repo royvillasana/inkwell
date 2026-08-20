@@ -11,7 +11,7 @@ the same editing model — they differ in what the surrounding application can d
 | | **Light** | **Desktop** |
 | --- | --- | --- |
 | File | `Inkwell.html` | `desktop/` |
-| Size | one 155 KB file | Electron app |
+| Size | one 156 KB file | Electron app, 115 MB download |
 | Install | none — double-click it | `npm install && npm start` |
 | Dependencies | zero | Electron only |
 | Files | one at a time, browser pickers | real filesystem, autosave, file watching |
@@ -60,7 +60,7 @@ Use it when you want to hand someone an editor as a single attachment.
 
 ## Desktop build
 
-Prebuilt: **[Inkwell-2.0.0-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+Prebuilt: **[Inkwell-2.1.0-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
 (macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
 app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
 
