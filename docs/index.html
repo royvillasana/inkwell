@@ -250,6 +250,37 @@ nav .get:hover{background:#000}
 .build li svg{width:16px;height:16px;flex:0 0 auto;margin-top:3px;color:var(--accent);opacity:.9}
 .build .btn{align-self:flex-start;margin-top:auto}
 
+/* ---------- comparison table ---------- */
+.compare{margin-top:clamp(44px,5vw,72px)}
+.compare .head{margin-bottom:clamp(26px,3vw,38px)}
+.tablecard{background:var(--p-page);border-radius:22px;overflow:hidden}
+.tablecard table{width:100%;border-collapse:collapse;font-size:15.5px}
+.tablecard th,.tablecard td{padding:15px 20px;text-align:left;vertical-align:middle}
+.tablecard thead th{
+  font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--p-faint);padding-top:20px;padding-bottom:14px
+}
+.tablecard thead th:not(:first-child),.tablecard td:not(:first-child){text-align:center;width:23%}
+.tablecard tbody tr{border-top:1px solid var(--p-rule)}
+.tablecard tbody td:first-child{color:var(--p-ink);font-weight:500}
+.tablecard .yes{color:var(--accent-deep);font-weight:700;font-size:17px}
+.tablecard .no{color:var(--p-faint)}
+.tablecard .part{color:var(--p-soft);font-size:13px}
+.tablecard tbody tr.hi{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.tablecard tbody tr.hi td:first-child{font-weight:640}
+.tablecard .tag-new{
+  display:inline-block;margin-left:9px;padding:2px 8px;border-radius:999px;
+  background:var(--accent-deep);color:#fffefb;font-size:10.5px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;vertical-align:1px
+}
+@media (max-width:640px){
+  .tablecard{border-radius:16px}
+  .tablecard table{font-size:14px}
+  .tablecard th,.tablecard td{padding:12px 13px}
+  .tablecard thead th:not(:first-child),.tablecard td:not(:first-child){width:26%}
+  .tablecard .yes{font-size:16px}
+}
+
 /* ---------- download band ---------- */
 .download{text-align:center}
 .download .btn{margin-top:8px}
@@ -455,6 +486,68 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
         </ul>
         <a class="btn btn-line" href="try.html">Open it now</a>
       </div>
+    </div>
+  </div>
+
+  <div class="wrap compare">
+    <div class="head">
+      <div class="eyebrow">Side by side</div>
+      <h2>Which one do I <em class="acc">want?</em></h2>
+    </div>
+
+    <div class="tablecard">
+      <table>
+        <thead>
+          <tr><th scope="col">&nbsp;</th><th scope="col">Light</th><th scope="col">Desktop</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Block live preview <span class="part">— source shows for the block you are in</span></td>
+            <td class="yes" aria-label="yes">✓</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr class="hi">
+            <td>Rich text mode <span class="tag-new">TipTap</span>
+              <span class="part">— WYSIWYG, syntax never appears</span></td>
+            <td class="no" aria-label="no">—</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Tables, task lists, footnotes, <code>[TOC]</code></td>
+            <td class="yes" aria-label="yes">✓</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Tabs, split view, presentation mode</td>
+            <td class="yes" aria-label="yes">✓</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Every Mermaid diagram type</td>
+            <td class="part">flowcharts only</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Full LaTeX, including chemistry</td>
+            <td class="part">common subset</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>A folder of notes, searchable</td>
+            <td class="no" aria-label="no">—</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Wiki links with backlinks</td>
+            <td class="part">one folder</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Autosave, file watching, version history</td>
+            <td class="no" aria-label="no">—</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr>
+            <td>Export to docx, LaTeX, EPUB <span class="part">— via Pandoc</span></td>
+            <td class="no" aria-label="no">—</td><td class="yes" aria-label="yes">✓</td>
+          </tr>
+          <tr class="hi">
+            <td>Runs with nothing installed</td>
+            <td class="yes" aria-label="yes">✓</td><td class="no" aria-label="no">—</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
