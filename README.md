@@ -19,6 +19,7 @@ the same editing model — they differ in what the surrounding application can d
 | Search | current document | every note in the vault |
 | Links | `[[wiki links]]` inside one folder | resolved across the vault, with backlinks |
 | Diagrams | built-in flowcharts | real Mermaid, every diagram type |
+| Editing | block live preview | block live preview **plus** TipTap rich text |
 | Maths | MathML subset | real KaTeX with mhchem |
 | Images | embedded as base64 | saved beside the note, linked relatively |
 | Sharing | email the file, it just works | package a real app |
@@ -76,6 +77,12 @@ downloads: `npm approve-scripts electron`.
 
 ### What the desktop build adds
 
+- **Rich text mode** (`⇧⌘R`) — a full WYSIWYG surface built on
+  [TipTap](https://tiptap.dev) / ProseMirror, over the same markdown file.
+  Markdown syntax never appears; formatting applies to the selection through a
+  floating bubble menu, tables resize by dragging, and the document is written
+  back out as plain markdown when you leave. The block editor and rich mode are
+  two views of one file — switch freely.
 - **Vaults.** Open a folder and get a real tree with nested directories, plus
   create, rename, reveal and move-to-trash from the context menu.
 - **Search across every note**, with case, whole-word and regex switches, line
@@ -116,6 +123,10 @@ desktop/
         aids.js      auto-pairing, slash menu, table tools, goal ring
         vault.js     sidebar: tree, search, tags, backlinks
         app.js       tabs, disk I/O, views, commands, boot
+        rich.js      real Mermaid and KaTeX, loaded from vendor/
+        rich-editor.js  rich text mode: TipTap over the same markdown
+        convert.js   HTML <-> markdown, clipboard, smart punctuation
+      vendor/        mermaid, katex, turndown and the tiptap bundle
   test/
     run.js             main-process tests, plain node
     smoke-renderer.js  runs inside a real window
@@ -133,7 +144,7 @@ renamed, so a crash cannot truncate a note.
 ### Tests
 
 ```bash
-npm test          # 30 main-process tests: files, search, backlinks, assets, vendor, pandoc
+npm test          # 31 main-process tests: files, search, backlinks, assets, vendor, pandoc
 npm run test:app  # boots a real window and asserts 21 renderer checks
 npm run test:all
 ```
@@ -165,7 +176,9 @@ purpose. ✓ = done, ~ = partial, ✗ = not yet.
 
 | Typora feature | Light | Desktop | Note |
 | --- | :---: | :---: | --- |
-| Live preview while typing | ~ | ~ | Source shows for the focused **block**, not inline per element |
+| Live preview while typing | ~ | ✓ | Light: source shows for the focused **block**. Desktop adds a true inline WYSIWYG via TipTap (`⇧⌘R`) |
+| Selection formatting toolbar | ✗ | ✓ | Floating bubble menu in rich text mode |
+| Drag to resize table columns | ✗ | ✓ | In rich text mode |
 | Auto-pair brackets and quotes | ✓ | ✓ | |
 | Smart quotes, dashes, ellipses | ✗ | ✓ | Toggle in preferences |
 | Emoji autocomplete on `:` | ~ | ✓ | Light build offers emoji through `/` only |
@@ -176,7 +189,6 @@ purpose. ✓ = done, ~ = partial, ✗ = not yet.
 | Headings, emphasis, strike, highlight, sub/sup | ✓ | ✓ | |
 | Code fences, ~90 languages, line numbers | ✓ | ✓ | |
 | Tables with alignment | ✓ | ✓ | Toolbar for rows, columns, alignment |
-| Drag to resize table columns | ✗ | ✗ | |
 | Lists, nested lists, task lists | ✓ | ✓ | |
 | Footnotes, YAML front matter, `[TOC]` | ✓ | ✓ | |
 | Automatic heading numbers | ✗ | ✓ | |
@@ -230,6 +242,10 @@ Without it, HTML, PDF, `.doc`, markdown and plain text still work.
   their footing.
 - In the **light** build, diagrams cover `graph TD/LR` only and LaTeX covers the
   common set. The desktop build has the real libraries and neither limit.
+- Rich text mode round-trips through HTML, so it normalises what it writes:
+  loose lists come back tight, and reference-style links become inline. Diagrams
+  and display maths appear as editable code blocks there rather than rendered —
+  the block editor still renders them.
 - Raw HTML in a document is escaped and shown as text rather than executed.
 
 ---

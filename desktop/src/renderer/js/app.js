@@ -16,6 +16,7 @@ import { mountAids, positionTableTools, drawGoal, tableOp, closeSlash } from "./
 import * as V from "./vault.js";
 import * as Rich from "./rich.js";
 import * as Convert from "./convert.js";
+import * as Rich9 from "./rich-editor.js";
 
 const api = window.inkwell;
 const IS_MAC = api.platform === "darwin";
@@ -30,6 +31,18 @@ export function toast(msg){
 }
 const fmtTime = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+/* The live document text, wherever the caret currently lives. Rich text mode
+   keeps the document inside TipTap, so serialize() alone is not enough. */
+function docText(){
+  if (prefs.rich && Rich9.isReady()) {
+    const md = Rich9.getMarkdown();
+    if (md != null) return md;
+  }
+  if (prefs.source) return $("#source").value;
+  if (prefs.split) return $("#split-src").value;
+  return serialize();
+}
+
 /* ------------------------------------------------------------------- tabs */
 const docs = [];
 let docSeq = 0, curDoc = null;
@@ -43,7 +56,7 @@ function snapshotDoc(commitFirst){
   const d = docs.find(x => x.id === curDoc);
   if (!d) return;
   Object.assign(d, {
-    text: serialize(), name: state.name, path: state.path,
+    text: docText(), name: state.name, path: state.path,
     mtime: state.mtime, dirty: state.dirty, scrollTop: $("#scroll").scrollTop
   });
 }
@@ -58,6 +71,7 @@ function adopt(text, name, path, mtime){
   }
   curDoc = d.id;
   loadText(d.text, d.name, { path: d.path, mtime: d.mtime });
+  if (prefs.rich && Rich9.isReady()) Rich9.setMarkdown(d.text);
   renderTabs();
   V.setActivePath(d.path);
   return d;
@@ -71,6 +85,7 @@ function switchDoc(id){
   curDoc = id;
   loadText(d.text, d.name, { path: d.path, mtime: d.mtime });
   state.dirty = d.dirty;
+  if (prefs.rich && Rich9.isReady()) Rich9.setMarkdown(d.text);
   renderTabs();
   V.setActivePath(d.path);
   updateStatus();
@@ -178,7 +193,7 @@ async function openFileDialog(){
 }
 
 async function saveDoc(forceDialog){
-  const text = serialize();      // no commit: keeps the caret where the user left it
+  const text = docText();        // no commit: keeps the caret where the user left it
   try {
     if (!forceDialog && state.path) {
       const res = await api.file.write(state.path, text);
@@ -210,8 +225,7 @@ function scheduleAutosave(){
   if (!prefs.autosave || !state.path || !state.dirty) return;
   autosaveTimer = setTimeout(async () => {
     if (!state.dirty || !state.path) return;
-    const wasActive = state.activeId;
-    const text = serialize();
+    const text = docText();
     try {
       const res = await api.file.write(state.path, text);
       state.mtime = res.mtime;
@@ -261,7 +275,7 @@ async function checkExternal(changedPath){
 /* ------------------------------------------------------------- status bar */
 let statusTimer = null;
 function updateStatus(){
-  const text = serialize();
+  const text = docText();
   const words = (text.replace(/[#>*_`~\-\[\]()!|]/g, " ").match(/\S+/g) || []).length;
   $("#st-words").textContent = words.toLocaleString();
   $("#st-chars").textContent = text.length.toLocaleString();
@@ -435,6 +449,43 @@ function toggleSource(){
     updateStatus();
   }
 }
+async function toggleRich(){
+  prefs.rich = !prefs.rich;
+  if (prefs.rich) {
+    if (prefs.source) toggleSource();
+    if (prefs.split) toggleSplit();
+    commit();
+    const md = serialize();
+    document.body.classList.add("mode-rich");
+    $("#btn-rich").classList.add("on");
+    try {
+      await Rich9.open($("#richwrap"), md, {
+        spellcheck: prefs.spellcheck,
+        onChange: () => { state.dirty = true; updateStatus(); scheduleAutosave(); }
+      });
+      Rich9.setLinkAsker(prev => askText("Where should this link point?", prev,
+        { title: "Link", label: "URL", ok: "Apply", placeholder: "https://" }));
+    } catch (err) {
+      prefs.rich = false;
+      document.body.classList.remove("mode-rich");
+      $("#btn-rich").classList.remove("on");
+      say("The rich text editor could not start: " + err.message, "Rich text unavailable");
+      return;
+    }
+  } else {
+    const md = Rich9.getMarkdown();
+    Rich9.close();
+    document.body.classList.remove("mode-rich");
+    $("#btn-rich").classList.remove("on");
+    if (md != null) {
+      loadText(md, state.name, { path: state.path, mtime: state.mtime });
+      state.dirty = true;
+    }
+  }
+  updateStatus();
+  savePrefs();
+}
+
 let splitTimer = null;
 function toggleSplit(){
   prefs.split = !prefs.split;
@@ -540,8 +591,27 @@ async function appCSS(){
   }
   return cssCache;
 }
+/* A note's images are written next to the note, so "assets/x.png" is relative
+   to the note's folder — not to the renderer's own index.html. Point them at
+   the real file so they actually appear. */
+function noteDir(){
+  if (!state.path) return null;
+  const sep = api.platform === "win32" ? "\\" : "/";
+  return state.path.slice(0, state.path.lastIndexOf(sep) + 1);
+}
+function resolveImages(root){
+  const dir = noteDir();
+  if (!dir || !root) return;
+  root.querySelectorAll("img[src]").forEach(img => {
+    const src = img.getAttribute("src") || "";
+    if (/^(https?:|data:|file:|blob:|\/)/.test(src)) return;
+    img.src = "file://" + encodeURI(dir + src).replace(/#/g, "%23");
+  });
+}
+
 function renderedBody(){
-  return state.blocks.map(b => '<div class="block"><div class="rendered">' + renderBlock(b.src) + "</div></div>").join("\n");
+  const blocks = prefs.rich && Rich9.isReady() ? splitBlocks(docText()) : state.blocks.map(b => b.src);
+  return blocks.map(src => '<div class="block"><div class="rendered">' + renderBlock(src) + "</div></div>").join("\n");
 }
 async function exportHTMLDoc(){
   commit();
@@ -742,6 +812,7 @@ const COMMANDS = [
   { name: "Search the vault", key: "⇧⌘F", run: () => { toggleSidebar(true); setPane("search"); } },
   { name: "Find & replace", key: "⌘F", run: () => openFind(true) },
   { name: "Source mode", key: "⌘/", run: () => toggleSource() },
+  { name: "Rich text mode", key: "⇧⌘R", run: () => toggleRich() },
   { name: "Split view", key: "⇧⌘E", run: () => toggleSplit() },
   { name: "Focus mode", key: "⇧⌘F", run: () => toggleFocus() },
   { name: "Typewriter mode", key: "", run: () => toggleTypewriter() },
@@ -959,6 +1030,7 @@ const MENU = {
   "pane-tags": () => { toggleSidebar(true); setPane("tags"); },
   "source": () => toggleSource(),
   "split": () => toggleSplit(),
+  "rich": () => toggleRich(),
   "focus": () => toggleFocus(),
   "typewriter": () => toggleTypewriter(),
   "present": () => startPresentation(),
@@ -984,6 +1056,20 @@ const MENU = {
   "h3": () => withActive(ta => setHeading(ta, 3)),
   "h0": () => withActive(ta => setHeading(ta, 0))
 };
+
+/* menu formatting: in rich text mode TipTap owns the selection */
+const RICH_CMD = {
+  "fmt-bold": ["bold"], "fmt-italic": ["italic"], "fmt-code": ["code"],
+  "fmt-strike": ["strike"], "fmt-mark": ["highlight"], "fmt-link": ["link"],
+  h1: ["heading", 1], h2: ["heading", 2], h3: ["heading", 3], h0: ["heading", 0],
+  "ins-table": ["table"], "ins-code": ["codeblock"], "ins-hr": ["hr"]
+};
+function richHandles(cmd){
+  if (!prefs.rich || !Rich9.isReady()) return false;
+  const spec = RICH_CMD[cmd];
+  if (!spec) return false;
+  return Rich9.command(spec[0], spec[1]);
+}
 
 function withActive(fn){
   if (state.activeId == null) {
@@ -1019,7 +1105,7 @@ async function boot(){
   if (prefs.focus) { prefs.focus = false; toggleFocus(); }
   if (prefs.typewriter) { prefs.typewriter = false; toggleTypewriter(); }
   if (prefs.wide) { prefs.wide = false; toggleWide(); }
-  prefs.source = false; prefs.split = false;
+  prefs.source = false; prefs.split = false; prefs.rich = false;
   applyPrefs();
 
   if (prefs.followSystemTheme) {
@@ -1029,7 +1115,7 @@ async function boot(){
 
   /* editor hooks */
   on("change", () => { updateStatus(); scheduleAutosave(); });
-  on("render", () => Rich.hydrate($("#paper")));
+  on("render", () => { Rich.hydrate($("#paper")); resolveImages($("#paper")); });
   on("load", () => { closeSlash(); });
   Convert.initTurndown();
   setHtmlPasteHandler(html => prefs.pasteAsMarkdown ? Convert.htmlToMarkdown(html) : null);
@@ -1051,7 +1137,11 @@ async function boot(){
   updateStatus();
 
   wireUI();
-  api.on.menu(({ cmd, arg }) => { const fn = MENU[cmd]; if (fn) fn(arg); });
+  api.on.menu(({ cmd, arg }) => {
+    if (richHandles(cmd)) return;
+    const fn = MENU[cmd];
+    if (fn) fn(arg);
+  });
   api.on.openPaths(list => (list || []).forEach(p => openPath(p)));
   api.on.vaultChanged(({ path }) => { V.refreshVault(); checkExternal(path); });
   api.on.themeChanged(dark => {
@@ -1071,6 +1161,7 @@ function wireUI(){
   $("#btn-newnote").onclick = () => V.newNote(V.vault.root);
   $("#btn-find").onclick = () => openFind(!$("#find").classList.contains("on"));
   $("#btn-focus").onclick = () => toggleFocus();
+  $("#btn-rich").onclick = () => toggleRich();
   $("#btn-split").onclick = () => toggleSplit();
   $("#btn-present").onclick = () => startPresentation();
   $("#btn-hist").onclick = () => historyDialog();
@@ -1158,6 +1249,7 @@ function wireUI(){
     const k = e.key.toLowerCase();
     if (e.shiftKey && k === "p") { e.preventDefault(); $("#palette").classList.contains("on") ? closePalette() : openPalette("commands"); }
     else if (e.shiftKey && k === "k") { e.preventDefault(); quickOpen(); }
+    else if (e.shiftKey && k === "r") { e.preventDefault(); toggleRich(); }
     else if (k === "," ) { e.preventDefault(); settingsDialog(); }
     else if (k === "\\") { e.preventDefault(); toggleSidebar(); }
     else if (e.key === "Tab") { e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1); }

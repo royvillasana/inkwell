@@ -22,8 +22,20 @@
     "vendor": "node scripts/vendor.js"
   },
   "devDependencies": {
+    "@tiptap/core": "^3.30.2",
+    "@tiptap/extension-highlight": "^3.30.2",
+    "@tiptap/extension-image": "^3.30.2",
+    "@tiptap/extension-link": "^3.30.2",
+    "@tiptap/extension-placeholder": "^3.30.2",
+    "@tiptap/extension-table": "^3.30.2",
+    "@tiptap/extension-task-item": "^3.30.2",
+    "@tiptap/extension-task-list": "^3.30.2",
+    "@tiptap/extension-typography": "^3.30.2",
+    "@tiptap/pm": "^3.30.2",
+    "@tiptap/starter-kit": "^3.30.2",
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
     "katex": "^0.18.4",
     "mermaid": "^11.17.0",
     "turndown": "^7.2.4",
@@ -118,7 +130,8 @@
     }
   },
   "allowScripts": {
-    "electron@43.4.1": true
+    "electron@43.4.1": true,
+    "esbuild@0.28.2": true
   },
   "//": "mermaid, katex and turndown are build-time only: scripts/vendor.js copies the files the renderer loads into src/renderer/vendor, so they must not be bundled from node_modules."
 }

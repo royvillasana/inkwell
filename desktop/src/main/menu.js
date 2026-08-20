@@ -124,6 +124,7 @@ function buildMenu(handlers){
       item("Tags", null, "pane-tags"),
       { type: "separator" },
       item("Source Mode", "CmdOrCtrl+/", "source"),
+      item("Rich Text Mode", "CmdOrCtrl+Shift+R", "rich"),
       item("Split View", "CmdOrCtrl+Shift+P".replace("P", "E"), "split"),
       item("Focus Mode", "CmdOrCtrl+Shift+F", "focus"),
       item("Typewriter Mode", null, "typewriter"),

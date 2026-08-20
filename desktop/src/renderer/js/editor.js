@@ -30,7 +30,8 @@ export const prefs = {
   measure: 46, sidebar: true, focus: false, typewriter: false, wide: false,
   lineNumbers: false, autopair: true, spellcheck: true, goal: 0,
   autosave: true, autosaveDelay: 1200, source: false, split: false,
-  smartPunctuation: false, pasteAsMarkdown: true, numberHeadings: false
+  smartPunctuation: false, pasteAsMarkdown: true, numberHeadings: false,
+  rich: false
 };
 
 /* ---- events -------------------------------------------------------------- */

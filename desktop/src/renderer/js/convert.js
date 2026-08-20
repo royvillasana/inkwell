@@ -33,20 +33,70 @@ export function initTurndown(){
     }
   });
   td.addRule("keepBreaks", { filter: "br", replacement: () => "  \n" });
+
+  /* turndown-plugin-gfm emits a single tilde; GFM and our parser want two */
+  const svc = td;
+  td.addRule("strikethrough2", {
+    filter: ["del", "s", "strike"],
+    replacement: content => (content.trim() ? "~~" + content + "~~" : "")
+  });
+
+  /* TipTap task lists carry their state on data attributes */
+  td.addRule("taskList", {
+    filter: node => node.nodeName === "UL" && node.getAttribute("data-type") === "taskList",
+    replacement: content => "\n\n" + content.replace(/^\n+|\n+$/g, "") + "\n\n"
+  });
+  td.addRule("taskItem", {
+    filter: node => node.nodeName === "LI" && node.getAttribute("data-type") === "taskItem",
+    replacement: (content, node) => {
+      const done = node.getAttribute("data-checked") === "true";
+      const text = content.replace(/\n+/g, " ").trim();
+      return "- [" + (done ? "x" : " ") + "] " + text + "\n";
+    }
+  });
+
+  /* The GFM plugin refuses TipTap's tables (cells wrap their text in <p>),
+     so build the pipe table directly and convert each cell on its own. */
+  td.addRule("pipeTable", {
+    filter: "table",
+    replacement: (content, node) => {
+      const rows = Array.from(node.querySelectorAll("tr"));
+      if (!rows.length) return content;
+      const cell = c => {
+        let out = "";
+        try { out = svc.turndown(c.innerHTML); } catch (e) { out = c.textContent || ""; }
+        return out.replace(/\s+/g, " ").trim().replace(/\|/g, "\\|");
+      };
+      const grid = rows.map(r => Array.from(r.children).map(cell));
+      const cols = Math.max.apply(null, grid.map(r => r.length));
+      grid.forEach(r => { while (r.length < cols) r.push(""); });
+      const line = cells => "| " + cells.join(" | ") + " |";
+      const head = grid[0];
+      const sep = "| " + head.map(() => "---").join(" | ") + " |";
+      return "\n\n" + [line(head), sep].concat(grid.slice(1).map(line)).join("\n") + "\n\n";
+    }
+  });
+
   td.addRule("dropStyleAndScript", { filter: ["style", "script", "noscript"], replacement: () => "" });
   return td;
 }
 
-/* Returns markdown, or null when the HTML is not worth converting. */
-export function htmlToMarkdown(html){
+/* Returns markdown, or null when the HTML is not worth converting.
+   Pass {trusted:true} for HTML the app produced itself: foreign HTML gets its
+   classes and inline styles stripped, but our own carries meaning in them —
+   language-js on a code block, data-type on a task list. */
+export function htmlToMarkdown(html, opts = {}){
   const svc = initTurndown();
   if (!svc || !html) return null;
-  /* Word and Google Docs wrap everything in enormous style blocks */
-  const cleaned = html
+  let cleaned = html
     .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, "")
-    .replace(/\sclass="[^"]*"/g, "")
-    .replace(/\sstyle="[^"]*"/g, "");
+    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, "");
+  if (!opts.trusted) {
+    /* Word and Google Docs wrap everything in enormous style blocks */
+    cleaned = cleaned
+      .replace(/\sclass="[^"]*"/g, "")
+      .replace(/\sstyle="[^"]*"/g, "");
+  }
   try {
     const md = svc.turndown(cleaned).replace(/\n{3,}/g, "\n\n").trim();
     return md || null;

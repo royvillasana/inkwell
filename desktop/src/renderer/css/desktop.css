@@ -128,3 +128,50 @@ body.numbered .rendered h3::before{content:counter(h1) "." counter(h2) "." count
 body.numbered .rendered h4::before{content:counter(h1) "." counter(h2) "." counter(h3) "." counter(h4) ".  ";color:var(--ink-faint)}
 body.numbered .rendered h5::before{content:counter(h1) "." counter(h2) "." counter(h3) "." counter(h4) "." counter(h5) ".  ";color:var(--ink-faint)}
 body.numbered .rendered h6::before{content:counter(h1) "." counter(h2) "." counter(h3) "." counter(h4) "." counter(h5) "." counter(h6) ".  ";color:var(--ink-faint)}
+
+/* ---------- Rich text mode (TipTap) ---------- */
+#richwrap{display:none;flex:1;min-height:0;overflow:auto;position:relative}
+body.mode-rich #scroll,body.mode-rich #source,body.mode-rich #splitwrap{display:none}
+body.mode-rich #richwrap{display:block}
+#richwrap::-webkit-scrollbar{width:11px}
+#richwrap::-webkit-scrollbar-thumb{background:var(--rule);border-radius:11px;border:3px solid var(--bg)}
+.rich-doc{max-width:var(--measure);margin:0 auto;padding:56px 40px 45vh}
+.rich-surface{outline:none;min-height:60vh}
+.rich-surface p.is-editor-empty:first-child::before{
+  content:attr(data-placeholder);float:left;height:0;pointer-events:none;color:var(--ink-faint)
+}
+/* ProseMirror's own bits */
+.rich-surface .ProseMirror-selectednode{outline:2px solid var(--accent);border-radius:4px}
+.rich-surface img{max-width:100%;border-radius:var(--radius)}
+.rich-surface ul[data-type="taskList"]{list-style:none;padding-left:.4em}
+.rich-surface ul[data-type="taskList"] li{display:flex;gap:.55em;align-items:flex-start}
+.rich-surface ul[data-type="taskList"] li>label{margin-top:.28em}
+.rich-surface ul[data-type="taskList"] input{accent-color:var(--accent)}
+.rich-surface table{border-collapse:collapse;width:100%;margin:0 0 1em;table-layout:fixed}
+.rich-surface th,.rich-surface td{border:1px solid var(--rule);padding:7px 11px;position:relative;vertical-align:top}
+.rich-surface th{background:var(--panel);font-family:var(--font-ui);font-weight:620}
+.rich-surface .selectedCell:after{
+  content:"";position:absolute;inset:0;background:var(--accent-soft);pointer-events:none
+}
+.rich-surface .column-resize-handle{
+  position:absolute;right:-2px;top:0;bottom:0;width:4px;background:var(--accent);cursor:col-resize
+}
+.rich-surface pre{background:var(--code-bg);border:1px solid var(--rule-soft);border-radius:var(--radius);padding:14px 16px;overflow-x:auto}
+.rich-surface pre code{font-family:var(--font-mono);font-size:13.5px;color:var(--code-ink)}
+.rich-surface blockquote{border-left:3px solid var(--accent);padding-left:1.1em;color:var(--ink-soft);margin-left:0}
+.rich-surface hr{border:0;height:1px;background:var(--rule);margin:2em 0}
+
+/* selection bubble */
+#rich-bubble{
+  position:fixed;z-index:60;display:none;align-items:center;gap:1px;padding:4px;
+  background:var(--panel);border:1px solid var(--rule);border-radius:10px;
+  box-shadow:var(--shadow);font-family:var(--font-ui)
+}
+#rich-bubble.on{display:flex}
+#rich-bubble button{
+  min-width:29px;height:28px;padding:0 7px;border-radius:6px;font-size:12.5px;
+  color:var(--ink-soft);transition:background var(--speed),color var(--speed)
+}
+#rich-bubble button:hover{background:var(--panel-2);color:var(--ink)}
+#rich-bubble button.on{background:var(--accent-soft);color:var(--accent)}
+#rich-bubble .sep{width:1px;height:17px;background:var(--rule);margin:0 4px}

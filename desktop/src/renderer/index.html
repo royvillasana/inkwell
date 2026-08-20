@@ -97,6 +97,9 @@
         <button class="tbtn" id="btn-focus" title="Focus mode (⇧⌘F)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>
         </button>
+        <button class="tbtn" id="btn-rich" title="Rich text mode (⌘⇧R)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5h9a3.5 3.5 0 0 1 0 7H5z"/><path d="M5 12h10a3.5 3.5 0 0 1 0 7H5z"/></svg>
+        </button>
         <button class="tbtn" id="btn-split" title="Split view (⌘⇧E)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
         </button>
@@ -137,6 +140,7 @@
 
     <div id="scroll"><div id="paper"></div></div>
     <textarea id="source" spellcheck="false"></textarea>
+    <div id="richwrap"></div>
     <div id="splitwrap">
       <textarea id="split-src" spellcheck="false"></textarea>
       <div id="split-prev"></div>

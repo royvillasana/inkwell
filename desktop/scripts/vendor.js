@@ -71,3 +71,11 @@ function du(dir){
 }
 
 main();
+
+/* the rich-text editor needs a real bundler, so it is a separate step */
+try {
+  require("child_process").execFileSync(process.execPath,
+    [path.join(__dirname, "tiptap", "build.mjs")], { stdio: "inherit" });
+} catch (err) {
+  console.error("vendor: tiptap bundle failed — rich text mode will be unavailable");
+}

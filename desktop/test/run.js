@@ -201,7 +201,8 @@ async function test(name, fn){
   await test("renderer modules and shell are all present", () => {
     const dir = path.join(__dirname, "..", "src", "renderer");
     for (const f of ["index.html", "js/markdown.js", "js/editor.js", "js/dialogs.js",
-                     "js/aids.js", "js/vault.js", "js/app.js", "css/app.css", "css/desktop.css"])
+                     "js/aids.js", "js/vault.js", "js/app.js", "js/rich.js", "js/convert.js",
+                     "js/rich-editor.js", "css/app.css", "css/desktop.css"])
       assert.ok(fs.existsSync(path.join(dir, f)), "missing " + f);
   });
 
@@ -215,6 +216,21 @@ async function test(name, fn){
       assert.ok(fs.existsSync(path.join(v, f)), "missing " + f);
     const fonts = fs.readdirSync(path.join(v, "katex", "fonts"));
     assert.ok(fonts.length >= 10 && fonts.every(f => f.endsWith(".woff2")), "katex fonts look wrong");
+  });
+
+  await test("tiptap bundle is built and self-contained", () => {
+    const f = path.join(__dirname, "..", "src", "renderer", "vendor", "tiptap", "tiptap.bundle.mjs");
+    assert.ok(fs.existsSync(f), "missing — run npm run vendor");
+    const src = fs.readFileSync(f, "utf8");
+    assert.ok(src.length > 200000, "bundle looks truncated (" + src.length + " bytes)");
+    /* esbuild must have inlined everything: nothing may still point at a package
+       the renderer cannot resolve (matching real specifiers, not minified code
+       that happens to contain the word "from") */
+    const bare = (src.match(/from\s*["'](?:@tiptap|prosemirror|@remirror)[^"']*["']/g) || [])
+      .concat(src.match(/\brequire\s*\(\s*["'][^.][^"']*["']\s*\)/g) || []);
+    assert.strictEqual(bare.length, 0, "unbundled dependency: " + bare.slice(0, 3).join(", "));
+    for (const name of ["Editor", "StarterKit", "TaskList", "Table"])
+      assert.ok(src.includes(name), "export missing: " + name);
   });
 
   await test("mermaid entry only imports its own local chunks", () => {
