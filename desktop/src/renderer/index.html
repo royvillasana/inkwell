@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file: blob:; font-src 'self' data:; media-src 'self' file: data:; connect-src 'self'">
+<title>Inkwell</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/desktop.css">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+</head>
+<body class="desktop">
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="side-head">
+      <div class="brand"><span class="dot"></span> Inkwell</div>
+      <button id="btn-vault" class="ghost" title="Open a vault (folder of notes)">
+        <span id="vault-name">No vault</span>
+      </button>
+    </div>
+
+    <div class="side-tabs">
+      <button data-pane="files" class="on" title="Files">Files</button>
+      <button data-pane="outline" title="Outline">Outline</button>
+      <button data-pane="search" title="Search the vault">Search</button>
+      <button data-pane="tags" title="Tags and backlinks">Tags</button>
+    </div>
+
+    <div class="side-body">
+      <div class="side-pane on" id="pane-files">
+        <div id="tree"></div>
+        <button class="side-action" id="btn-openfolder">Open vault…</button>
+        <button class="side-action" id="btn-newnote">New note in vault</button>
+      </div>
+
+      <div class="side-pane" id="pane-outline"><div id="toc"></div></div>
+
+      <div class="side-pane" id="pane-search">
+        <div class="vs-head">
+          <input id="vs-q" placeholder="Search every note" autocomplete="off" spellcheck="false">
+          <div class="opts">
+            <label><input type="checkbox" id="vs-case"> Aa</label>
+            <label><input type="checkbox" id="vs-word"> Word</label>
+            <label><input type="checkbox" id="vs-re"> .*</label>
+          </div>
+        </div>
+        <div id="vs-results"><div class="side-empty">Type to search every note in the vault.</div></div>
+      </div>
+
+      <div class="side-pane" id="pane-tags"></div>
+    </div>
+
+    <div class="side-foot">
+      <span class="foot-label">Theme</span>
+      <span class="theme-dot on" data-theme="paper" style="background:#fffefb" title="Paper"></span>
+      <span class="theme-dot" data-theme="sepia" style="background:#e9dcc6" title="Sepia"></span>
+      <span class="theme-dot" data-theme="night" style="background:#24272c" title="Night"></span>
+      <span class="theme-dot" data-theme="slate" style="background:#1d2230" title="Slate"></span>
+      <button id="btn-prefs" class="ghost" title="Preferences (⌘,)">⚙</button>
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="titlebar"></div>
+    <div id="tabs"></div>
+
+    <div id="toolbar">
+      <div class="tb">
+        <button class="tbtn" id="btn-sidebar" title="Toggle sidebar (⌘\)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+        </button>
+        <span class="tb-sep"></span>
+        <button class="tbtn" id="btn-new" title="New document (⌘N)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        </button>
+        <button class="tbtn" id="btn-open" title="Open file (⌘O)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        </button>
+        <button class="tbtn" id="btn-save" title="Save (⌘S)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        </button>
+      </div>
+
+      <div id="docname"><b>Untitled.md</b></div>
+
+      <div class="tb">
+        <button class="tbtn" id="btn-bold" title="Bold (⌘B)"><b>B</b></button>
+        <button class="tbtn" id="btn-italic" title="Italic (⌘I)"><i>I</i></button>
+        <button class="tbtn" id="btn-link" title="Link (⌘K)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+        </button>
+        <span class="tb-sep"></span>
+        <button class="tbtn" id="btn-find" title="Find &amp; replace (⌘F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </button>
+        <button class="tbtn" id="btn-focus" title="Focus mode (⇧⌘F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>
+        </button>
+        <button class="tbtn" id="btn-split" title="Split view (⌘⇧E)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
+        </button>
+        <button class="tbtn" id="btn-present" title="Presentation (F5)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+        </button>
+        <button class="tbtn" id="btn-hist" title="Version history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>
+        </button>
+        <button class="tbtn" id="btn-src" title="Source mode (⌘/)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg>
+        </button>
+        <button class="tbtn" id="btn-export" title="Export…">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="find">
+      <div class="row">
+        <input id="find-q" placeholder="Find" autocomplete="off" spellcheck="false">
+        <span class="count" id="find-count">0/0</span>
+        <button class="mini" id="find-prev">↑</button>
+        <button class="mini" id="find-next">↓</button>
+        <button class="mini" id="find-close">✕</button>
+      </div>
+      <div class="row">
+        <input id="find-r" placeholder="Replace with" autocomplete="off" spellcheck="false">
+        <button class="mini" id="find-one">Replace</button>
+        <button class="mini" id="find-all">All</button>
+      </div>
+      <div class="opts">
+        <label><input type="checkbox" id="find-case"> Match case</label>
+        <label><input type="checkbox" id="find-word"> Whole word</label>
+        <label><input type="checkbox" id="find-re"> Regex</label>
+      </div>
+    </div>
+
+    <div id="scroll"><div id="paper"></div></div>
+    <textarea id="source" spellcheck="false"></textarea>
+    <div id="splitwrap">
+      <textarea id="split-src" spellcheck="false"></textarea>
+      <div id="split-prev"></div>
+    </div>
+
+    <div id="status">
+      <span><b id="st-words">0</b> words</span>
+      <span><b id="st-chars">0</b> chars</span>
+      <span><b id="st-lines">0</b> lines</span>
+      <span><b id="st-read">0</b> min read</span>
+      <span class="grow"></span>
+      <span id="goal" style="display:none"></span>
+      <span id="st-saved"></span>
+      <button id="btn-type" title="Typewriter mode">typewriter</button>
+      <button id="btn-wide" title="Wide layout">wide</button>
+      <button id="btn-help" title="Command palette">⌘⇧P</button>
+    </div>
+  </div>
+</div>
+
+<div id="palette"><div class="box">
+  <input id="pal-q" placeholder="Type a command…" autocomplete="off" spellcheck="false">
+  <div class="list" id="pal-list"></div>
+</div></div>
+
+<div id="modal"><div class="sheet">
+  <h3 id="modal-title"></h3>
+  <div id="modal-content"></div>
+  <div class="actions" id="modal-actions"></div>
+</div></div>
+
+<div id="slash"></div>
+<div id="tabletools"></div>
+<div id="ctx"></div>
+<div id="present"></div>
+<div id="toast"></div>
+<div id="drop">Drop markdown or images here</div>
+
+<script src="vendor/turndown/turndown.js"></script>
+<script src="vendor/turndown/turndown-plugin-gfm.js"></script>
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/mhchem.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

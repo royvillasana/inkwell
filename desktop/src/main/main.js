@@ -1,0 +1,418 @@
+"use strict";
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, Menu } = require("electron");
+const fs = require("fs");
+const fsp = fs.promises;
+const path = require("path");
+const os = require("os");
+
+const store = require("./store");
+const files = require("./files");
+const search = require("./search");
+const { buildMenu } = require("./menu");
+const pandoc = require("./pandoc");
+
+const isDev = process.argv.includes("--dev");
+const windows = new Set();
+let watcher = null;
+let watchTimer = null;
+let pendingOpen = [];          // files handed to us before a window exists
+
+/* ------------------------------------------------------------------ window */
+function createWindow(openPath){
+  const saved = store.get().windowBounds;
+  const win = new BrowserWindow({
+    width: saved && saved.width || 1180,
+    height: saved && saved.height || 820,
+    x: saved && saved.x,
+    y: saved && saved.y,
+    minWidth: 620,
+    minHeight: 440,
+    show: false,
+    title: "Inkwell",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#16171a" : "#f7f6f3",
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    trafficLightPosition: { x: 14, y: 15 },
+    webPreferences: {
+      preload: path.join(__dirname, "..", "preload", "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true
+    }
+  });
+
+  win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+  win.once("ready-to-show", () => {
+    win.show();
+    if (isDev) win.webContents.openDevTools({ mode: "detach" });
+  });
+
+  /* renderer console shows up in the terminal, which is what you want while
+     developing and when a user sends you a log */
+  win.webContents.on("console-message", (e, level, message, line, source) => {
+    if (isDev || level >= 2) console.log("[renderer]", message, source ? "(" + source.split("/").pop() + ":" + line + ")" : "");
+  });
+
+  win.webContents.on("did-finish-load", () => {
+    const queue = openPath ? [openPath] : pendingOpen.splice(0);
+    if (queue.length) win.webContents.send("open-paths", queue);
+    if (process.env.INKWELL_SMOKE) runSmoke(win);
+    if (process.env.INKWELL_SHOT) captureShot(win);
+  });
+
+  /* external links open in the real browser, never inside the app */
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (e, url) => {
+    if (!url.startsWith("file://")) { e.preventDefault(); shell.openExternal(url); }
+  });
+
+  const remember = () => { if (!win.isDestroyed() && !win.isFullScreen()) store.save({ windowBounds: win.getBounds() }); };
+  win.on("resize", remember);
+  win.on("move", remember);
+  win.on("closed", () => windows.delete(win));
+
+  windows.add(win);
+  return win;
+}
+
+/* INKWELL_SHOT=<file> boots, optionally opens INKWELL_SHOT_VAULT, writes a PNG
+   of the window and exits. Used to review the interface without a screen. */
+async function captureShot(win){
+  try {
+    const v = process.env.INKWELL_SHOT_VAULT;
+    if (v) {
+      await search.setRoot(v);
+      store.save({ vault: v });
+      await win.webContents.executeJavaScript(
+        'import("./js/vault.js").then(V => V.restoreVault(' + JSON.stringify(v) + '))', true);
+    }
+    await new Promise(r => setTimeout(r, 900));
+    if (process.env.INKWELL_SHOT_SCRIPT) {
+      await win.webContents.executeJavaScript(
+        require("fs").readFileSync(process.env.INKWELL_SHOT_SCRIPT, "utf8"), true);
+      await new Promise(r => setTimeout(r, 700));
+    }
+    const img = await win.webContents.capturePage();
+    await fsp.writeFile(process.env.INKWELL_SHOT, img.toPNG());
+    console.log("SHOT " + process.env.INKWELL_SHOT);
+  } catch (err) { console.log("SHOT FAILED " + err.message); }
+  setTimeout(() => app.quit(), 150);
+}
+
+/* INKWELL_SMOKE=1 boots the app, asserts the renderer came up, prints a report
+   and exits. Used by the release checks; invisible in normal runs. */
+async function runSmoke(win){
+  const script = require("fs").readFileSync(process.env.INKWELL_SMOKE_FILE || path.join(__dirname, "..", "..", "test", "smoke-renderer.js"), "utf8");
+  try {
+    const report = await win.webContents.executeJavaScript(script, true);
+    console.log("SMOKE " + JSON.stringify(report, null, 2));
+    process.exitCode = report && report.failures && report.failures.length ? 1 : 0;
+  } catch (err) {
+    console.log("SMOKE FAILED " + err.message);
+    process.exitCode = 1;
+  }
+  setTimeout(() => app.quit(), 120);
+}
+
+const focused = () => BrowserWindow.getFocusedWindow() || Array.from(windows)[0];
+const broadcast = (ch, payload) => windows.forEach(w => { if (!w.isDestroyed()) w.webContents.send(ch, payload); });
+
+/* ----------------------------------------------------------------- watcher */
+function watchVault(root){
+  if (watcher) { try { watcher.close(); } catch (e) {} watcher = null; }
+  if (!root) return;
+  try {
+    watcher = fs.watch(root, { recursive: true }, (evt, name) => {
+      if (!name) return;
+      const base = path.basename(name);
+      if (base.startsWith(".") || base.endsWith(".tmp")) return;
+      const full = path.join(root, name);
+      if (files.isMarkdown(full)) search.touch(full);
+      clearTimeout(watchTimer);
+      watchTimer = setTimeout(() => broadcast("vault:changed", { path: full }), 260);
+    });
+  } catch (err) {
+    console.warn("vault watching unavailable:", err.message);
+  }
+}
+
+/* --------------------------------------------------------------------- IPC */
+const ok = data => ({ ok: true, data });
+const fail = err => ({ ok: false, error: err && err.message ? err.message : String(err) });
+const handle = (channel, fn) => ipcMain.handle(channel, async (event, ...args) => {
+  try { return ok(await fn(...args)); }
+  catch (err) { return fail(err); }
+});
+
+handle("settings:get", () => store.get());
+handle("settings:set", patch => store.save(patch));
+
+handle("dialog:openFile", async () => {
+  const r = await dialog.showOpenDialog(focused(), {
+    title: "Open Markdown",
+    properties: ["openFile", "multiSelections"],
+    filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "mkd", "txt"] }, { name: "All Files", extensions: ["*"] }]
+  });
+  if (r.canceled) return null;
+  const out = [];
+  for (const p of r.filePaths) {
+    const d = await files.readText(p);
+    store.addRecent({ path: p, name: path.basename(p) });
+    out.push({ path: p, name: path.basename(p), text: d.text, mtime: d.mtime });
+  }
+  buildMenu({ newWindow: () => createWindow() });
+  return out;
+});
+
+handle("dialog:openVault", async () => {
+  const r = await dialog.showOpenDialog(focused(), { title: "Open Vault", properties: ["openDirectory"] });
+  if (r.canceled) return null;
+  const root = r.filePaths[0];
+  store.save({ vault: root });
+  await search.setRoot(root);
+  watchVault(root);
+  return { root, tree: await files.listTree(root), stats: search.stats() };
+});
+
+handle("vault:open", async root => {
+  if (!root) return null;
+  await fsp.access(root);
+  store.save({ vault: root });
+  await search.setRoot(root);
+  watchVault(root);
+  return { root, tree: await files.listTree(root), stats: search.stats() };
+});
+handle("vault:tree", async () => {
+  const root = store.get().vault;
+  return root ? { root, tree: await files.listTree(root), stats: search.stats() } : null;
+});
+handle("vault:search", (q, opts) => search.search(q, opts || {}));
+handle("vault:backlinks", name => search.backlinks(name));
+handle("vault:unresolved", text => search.unresolved(text));
+handle("vault:resolve", name => search.resolveLink(name));
+handle("vault:tags", () => search.tags());
+handle("vault:byTag", tag => search.byTag(tag));
+handle("vault:quickOpen", q => search.quickOpen(q));
+handle("vault:reindex", () => search.build());
+
+handle("file:read", async p => {
+  const d = await files.readText(p);
+  store.addRecent({ path: p, name: path.basename(p) });
+  return { path: p, name: path.basename(p), text: d.text, mtime: d.mtime };
+});
+
+handle("file:write", async (p, text) => {
+  const res = await files.writeText(p, text);
+  await search.touch(p);
+  return { path: p, name: path.basename(p), mtime: res.mtime };
+});
+
+handle("file:saveAs", async (suggested, text) => {
+  const r = await dialog.showSaveDialog(focused(), {
+    title: "Save As",
+    defaultPath: suggested || "Untitled.md",
+    filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }]
+  });
+  if (r.canceled) return null;
+  const res = await files.writeText(r.filePath, text);
+  store.addRecent({ path: r.filePath, name: path.basename(r.filePath) });
+  await search.touch(r.filePath);
+  buildMenu({ newWindow: () => createWindow() });
+  return { path: r.filePath, name: path.basename(r.filePath), mtime: res.mtime };
+});
+
+handle("file:create", async (dir, name, contents) => {
+  const target = dir || store.get().vault;
+  if (!target) throw new Error("Open a vault first so new notes have a home.");
+  const f = await files.createFile(target, name, contents);
+  await search.touch(f.path);
+  return f;
+});
+
+handle("file:rename", async (p, next) => {
+  const f = await files.renameFile(p, next);
+  await search.touch(f.path);
+  return f;
+});
+
+handle("file:delete", async p => {
+  await shell.trashItem(p);
+  await search.touch(p);
+  return true;
+});
+
+handle("file:reveal", p => { shell.showItemInFolder(p); return true; });
+handle("file:stat", async p => {
+  try { const s = await fsp.stat(p); return { mtime: s.mtimeMs, size: s.size }; }
+  catch (err) { return null; }
+});
+
+handle("image:save", async (noteFile, data, ext) =>
+  files.saveImage(noteFile, store.get().imageFolder, data, ext));
+
+handle("image:pick", async noteFile => {
+  const r = await dialog.showOpenDialog(focused(), {
+    title: "Insert Image",
+    properties: ["openFile"],
+    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"] }]
+  });
+  if (r.canceled) return null;
+  const src = r.filePaths[0];
+  const data = await fsp.readFile(src);
+  return files.saveImage(noteFile, store.get().imageFolder, data, path.extname(src));
+});
+
+/* history snapshots live inside the vault, or in userData when there is none */
+const historyRoot = () => store.get().vault || app.getPath("userData");
+handle("history:save", (name, text) => files.writeSnapshot(historyRoot(), name, text));
+handle("history:list", name => files.listSnapshots(historyRoot(), name));
+handle("history:read", async file => (await files.readText(file)).text);
+
+handle("export:save", async (suggested, contents, filters) => {
+  const r = await dialog.showSaveDialog(focused(), { title: "Export", defaultPath: suggested, filters });
+  if (r.canceled) return null;
+  await fsp.writeFile(r.filePath, contents, "utf8");
+  return r.filePath;
+});
+
+/* Render to PDF in a hidden window so app chrome never leaks into the file. */
+handle("export:pdf", async (suggested, html) => {
+  const r = await dialog.showSaveDialog(focused(), {
+    title: "Export PDF",
+    defaultPath: suggested,
+    filters: [{ name: "PDF", extensions: ["pdf"] }]
+  });
+  if (r.canceled) return null;
+
+  const tmp = path.join(os.tmpdir(), "inkwell-print-" + Date.now() + ".html");
+  await fsp.writeFile(tmp, html, "utf8");
+  const hidden = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
+  try {
+    await hidden.loadFile(tmp);
+    await new Promise(res => setTimeout(res, 220));      // let fonts and MathML settle
+    const pdf = await hidden.webContents.printToPDF({
+      printBackground: true,
+      margins: { top: 0.8, bottom: 0.8, left: 0.8, right: 0.8 },
+      pageSize: "A4"
+    });
+    await fsp.writeFile(r.filePath, pdf);
+    return r.filePath;
+  } finally {
+    hidden.destroy();
+    fsp.unlink(tmp).catch(() => {});
+  }
+});
+
+handle("print", async html => {
+  const tmp = path.join(os.tmpdir(), "inkwell-print-" + Date.now() + ".html");
+  await fsp.writeFile(tmp, html, "utf8");
+  const hidden = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
+  await hidden.loadFile(tmp);
+  return new Promise(res => {
+    hidden.webContents.print({ silent: false, printBackground: true }, () => {
+      hidden.destroy();
+      fsp.unlink(tmp).catch(() => {});
+      res(true);
+    });
+  });
+});
+
+handle("assets:css", () =>
+  /* app.css is document styling and themes; desktop.css is window chrome and is
+     deliberately kept out of exported files */
+  fsp.readFile(path.join(__dirname, "..", "renderer", "css", "app.css"), "utf8"));
+
+handle("pandoc:info", async () => ({ version: await pandoc.version(), formats: pandoc.FORMATS }));
+
+handle("pandoc:export", async (formatId, markdown, suggestedBase, noteDir) => {
+  const fmt = pandoc.FORMATS.find(f => f.id === formatId);
+  if (!fmt) throw new Error("Unknown format");
+  if (!(await pandoc.version())) throw new Error("Pandoc is not installed.");
+  const r = await dialog.showSaveDialog(focused(), {
+    title: "Export as " + fmt.label,
+    defaultPath: (suggestedBase || "Untitled") + "." + fmt.ext,
+    filters: [{ name: fmt.label, extensions: [fmt.ext] }]
+  });
+  if (r.canceled) return null;
+  await pandoc.convert(formatId, markdown, r.filePath, noteDir || null);
+  return r.filePath;
+});
+
+handle("assets:katexCss", async () => {
+  /* inlined into exported HTML and PDF so equations survive outside the app */
+  const dir = path.join(__dirname, "..", "renderer", "vendor", "katex");
+  const css = await fsp.readFile(path.join(dir, "katex.min.css"), "utf8");
+  /* rewrite the relative font URLs to absolute ones the export can resolve */
+  return css.replace(/url\(fonts\//g, "url(file://" + path.join(dir, "fonts") + "/");
+});
+
+handle("window:new", () => { createWindow(); return true; });
+handle("window:title", (title, filePath) => {
+  const w = focused();
+  if (w) { w.setTitle(title); if (filePath) w.setRepresentedFilename(filePath); }
+  return true;
+});
+handle("window:edited", flag => {
+  const w = focused();
+  if (w && process.platform === "darwin") w.setDocumentEdited(!!flag);
+  return true;
+});
+
+handle("shell:open", url => {
+  if (/^https?:|^mailto:/.test(url)) shell.openExternal(url);
+  return true;
+});
+
+handle("confirm", async opts => {
+  const r = await dialog.showMessageBox(focused(), {
+    type: opts.type || "question",
+    buttons: opts.buttons || ["Cancel", "OK"],
+    defaultId: opts.defaultId != null ? opts.defaultId : 1,
+    cancelId: opts.cancelId != null ? opts.cancelId : 0,
+    message: opts.message,
+    detail: opts.detail
+  });
+  return r.response;
+});
+
+handle("theme:system", () => nativeTheme.shouldUseDarkColors);
+nativeTheme.on("updated", () => broadcast("theme:changed", nativeTheme.shouldUseDarkColors));
+
+/* --------------------------------------------------------------- lifecycle */
+const single = app.requestSingleInstanceLock();
+if (!single) app.quit();
+else {
+  app.on("second-instance", (e, argv) => {
+    const paths = argv.slice(1).filter(a => !a.startsWith("-") && files.isMarkdown(a));
+    const win = focused();
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+      if (paths.length) win.webContents.send("open-paths", paths);
+    }
+  });
+
+  app.on("open-file", (e, p) => {                 // macOS file association / drop on dock
+    e.preventDefault();
+    const win = focused();
+    if (win) win.webContents.send("open-paths", [p]);
+    else pendingOpen.push(p);
+  });
+
+  app.whenReady().then(async () => {
+    buildMenu({ newWindow: () => createWindow() });
+    const vault = store.get().vault;
+    if (vault && fs.existsSync(vault)) { await search.setRoot(vault); watchVault(vault); }
+    const argPaths = process.argv.slice(1).filter(a => !a.startsWith("-") && files.isMarkdown(a));
+    pendingOpen.push(...argPaths);
+    createWindow();
+
+    app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
+  });
+
+  app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
+  app.on("before-quit", () => store.flush());
+}

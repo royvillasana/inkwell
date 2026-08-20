@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# build output
+desktop/dist/
+desktop/src/renderer/vendor/
+
+# os
+.DS_Store
+*.swp
+
+# local
+*.log
