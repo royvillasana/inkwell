@@ -3,314 +3,422 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inkwell — a quiet markdown editor</title>
-<meta name="description" content="A markdown editor in the spirit of Typora. The block under your caret shows its markdown source; everything else stays rendered. Free, open source, no accounts, no telemetry.">
+<title>Inkwell — see your words, not the syntax</title>
+<meta name="description" content="A markdown editor that shows the source only for the block you are editing. Everything else stays finished prose. Free, open source, no accounts, no telemetry.">
 <link rel="icon" href="assets/icon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<meta property="og:title" content="Inkwell — a quiet markdown editor">
-<meta property="og:description" content="Typora-style live preview, vaults, real Mermaid and real KaTeX. Free and open source.">
+<meta property="og:title" content="Inkwell — see your words, not the syntax">
+<meta property="og:description" content="A markdown editor with vaults, real Mermaid and real KaTeX. Free and open source.">
 <meta property="og:image" content="https://royvillasana.github.io/inkwell/assets/screenshot.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
+/* ===========================================================================
+   The page borrows the editor's own two themes: Paper for the light panels,
+   Night for the dark ones. Values are lifted from the app's app.css.
+   =========================================================================== */
 :root{
-  --bg:#131417; --panel:#1a1c20; --panel-2:#22252a; --page:#16181b;
-  --ink:#e8e6e1; --ink-soft:#a3a099; --ink-faint:#6f6c66;
-  --rule:#282b31; --accent:#e0a06a; --accent-deep:#c07f49; --accent-soft:#31261d;
-  --max:1080px;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
-  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  /* night */
+  --n-bg:#16171a; --n-panel:#1c1e22; --n-panel-2:#24272c;
+  --n-ink:#dcdde0; --n-soft:#9aa0a8; --n-faint:#6b727b; --n-rule:#2b2f35;
+  /* paper */
+  --p-bg:#f7f6f3; --p-panel:#efeee9; --p-page:#fffefb;
+  --p-ink:#22201c; --p-soft:#5c574f; --p-faint:#918a7e; --p-rule:#e0ddd4;
+  /* shared */
+  --accent:#e0a06a; --accent-deep:#b3703c; --accent-soft:#31261d;
+  --display:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --serif:"Instrument Serif","Iowan Old Style",Palatino,Georgia,serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --pad:clamp(20px,5vw,56px);
+  --round:clamp(28px,4vw,52px);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{
-  margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-  font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
+  margin:0;background:var(--n-bg);color:var(--n-ink);
+  font-family:var(--display);font-size:17px;line-height:1.6;
+  font-optical-sizing:auto;-webkit-font-smoothing:antialiased;
 }
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
-section{padding:76px 0;border-top:1px solid var(--rule)}
-section:first-of-type{border-top:0}
-h1,h2,h3{letter-spacing:-.022em;line-height:1.15;margin:0}
-h2{font-size:clamp(24px,3.4vw,34px);font-weight:680;margin-bottom:10px}
-.lede{color:var(--ink-soft);max-width:60ch;margin:0 0 34px}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+.wrap{width:min(1180px,100% - 2*var(--pad));margin-inline:auto}
 
-/* ---------- header ---------- */
-header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
-  backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
-header .wrap{display:flex;align-items:center;gap:14px;height:60px}
-.brand{display:flex;align-items:center;gap:11px;font-weight:640;font-size:16px;color:var(--ink)}
-.brand img{width:26px;height:26px;border-radius:7px}
-header nav{margin-left:auto;display:flex;gap:22px;align-items:center;font-size:14px}
-header nav a{color:var(--ink-soft)}
-header nav a:hover{color:var(--ink);text-decoration:none}
-@media (max-width:640px){header nav a.hide-sm{display:none}}
+/* display type — tight, editorial, with a serif italic for the accent word */
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.038em;line-height:1.02;text-wrap:balance}
+h1{font-size:clamp(44px,8.2vw,104px)}
+h2{font-size:clamp(32px,5vw,62px)}
+h3{font-size:19px;letter-spacing:-.018em;line-height:1.25;font-weight:600}
+em.acc{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.01em}
+.eyebrow{
+  font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  display:flex;align-items:center;gap:9px;margin-bottom:22px
+}
+.eyebrow::before{content:"";width:26px;height:1px;background:currentColor;opacity:.5}
+.lede{font-size:clamp(17px,1.6vw,20px);line-height:1.5;max-width:44ch;text-wrap:pretty}
+
+/* ---------- floating pill nav ---------- */
+nav{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;
+  display:flex;align-items:center;gap:6px;padding:7px 7px 7px 15px;
+  background:rgba(255,254,251,.92);backdrop-filter:blur(16px) saturate(140%);
+  border-radius:999px;box-shadow:0 8px 30px rgba(0,0,0,.28);color:var(--p-ink);
+  font-size:14px;max-width:calc(100% - 32px)
+}
+nav .name{display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:-.02em}
+nav .name img{width:20px;height:20px;border-radius:6px}
+nav .links{display:flex;align-items:center;gap:4px;margin-left:10px}
+nav .links a{padding:7px 12px;border-radius:999px;color:var(--p-soft);font-weight:500;transition:.15s}
+nav .links a:hover{background:rgba(0,0,0,.06);color:var(--p-ink)}
+nav .get{
+  padding:8px 16px;border-radius:999px;background:var(--p-ink);color:var(--p-page);
+  font-weight:600;transition:.15s
+}
+nav .get:hover{background:#000}
+@media (max-width:720px){nav .links a.opt{display:none}}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  padding:15px 26px;border-radius:999px;font-weight:600;font-size:16px;
+  letter-spacing:-.01em;transition:transform .16s cubic-bezier(.2,.9,.3,1),background .16s,color .16s;
+  white-space:nowrap
+}
+.btn:hover{transform:translateY(-2px)}
+.btn svg{width:17px;height:17px;flex:0 0 auto}
+.btn-amber{background:var(--accent);color:#1d1509}
+.btn-amber:hover{background:#eeb07b}
+.btn-ink{background:var(--p-ink);color:var(--p-page)}
+.btn-ink:hover{background:#000}
+.btn-line{border:1px solid var(--n-rule);color:var(--n-ink)}
+.btn-line:hover{border-color:var(--accent);color:var(--accent)}
+.btn-line-d{border:1px solid var(--p-rule);color:var(--p-ink)}
+.btn-line-d:hover{border-color:var(--p-ink)}
 
 /* ---------- hero ---------- */
-.hero{padding:86px 0 60px;text-align:center;position:relative;overflow:hidden}
+.hero{position:relative;overflow:clip;padding:168px 0 0;isolation:isolate}
+.hero::before,.hero::after{content:"";position:absolute;z-index:-1;pointer-events:none}
+/* the warm glow that sits behind everything, echoing the ink-drop mark */
 .hero::before{
-  content:"";position:absolute;left:50%;top:-320px;transform:translateX(-50%);
-  width:900px;height:620px;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(224,160,106,.13),transparent 66%)
+  left:50%;top:-46vh;transform:translateX(-50%);
+  width:min(1500px,150vw);height:110vh;border-radius:50%;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(224,160,106,.30),rgba(224,160,106,.07) 45%,transparent 70%)
 }
-.hero h1{font-size:clamp(38px,6.4vw,66px);font-weight:720;margin-bottom:18px}
-.hero h1 em{font-style:normal;color:var(--accent)}
-.hero p.tag{font-family:var(--serif);font-size:clamp(17px,2.2vw,21px);color:var(--ink-soft);
-  max-width:56ch;margin:0 auto 34px;line-height:1.55}
-.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
-.btn{
-  display:inline-flex;align-items:center;gap:9px;padding:13px 22px;border-radius:11px;
-  font-size:15px;font-weight:600;border:1px solid var(--rule);color:var(--ink);
-  transition:transform .12s ease,border-color .12s ease,background .12s ease
+.hero::after{
+  inset:0;
+  background-image:radial-gradient(rgba(255,255,255,.045) 1px,transparent 1px);
+  background-size:3px 3px;mix-blend-mode:overlay
 }
-.btn:hover{text-decoration:none;transform:translateY(-1px)}
-.btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-deep));
-  border-color:var(--accent-deep);color:#221a12}
-.btn.primary:hover{filter:brightness(1.06)}
-.btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
-.btn svg{width:17px;height:17px}
-.meta{font-size:13px;color:var(--ink-faint)}
-.meta code{font-family:var(--mono);font-size:11.5px;background:var(--panel);padding:2px 6px;
-  border-radius:5px;word-break:break-all}
+.hero-copy{text-align:center;position:relative;z-index:2}
+.hero h1{margin-bottom:26px}
+.hero .lede{margin:0 auto;color:var(--n-soft);max-width:48ch}
+.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+.hero-note{margin-top:18px;font-size:13.5px;color:var(--n-faint)}
 
-.shot{margin:52px auto 0;max-width:960px;padding:0 24px}
-.shot img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid var(--rule);
-  box-shadow:0 30px 80px rgba(0,0,0,.5)}
-
-/* ---------- gatekeeper ---------- */
-.note{
-  display:flex;gap:14px;align-items:flex-start;max-width:660px;margin:26px auto 0;
-  background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);
-  border-radius:10px;padding:15px 17px;text-align:left;font-size:14px;color:var(--ink-soft)
+/* the app shot, bleeding off the bottom of the hero */
+.stage{position:relative;margin-top:64px;padding-inline:var(--pad)}
+.stage-inner{
+  position:relative;width:min(1240px,100%);margin-inline:auto;
+  border-radius:clamp(14px,1.6vw,22px);overflow:hidden;
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 -1px 0 rgba(255,255,255,.06) inset,0 50px 120px -30px rgba(0,0,0,.85);
+  transform:perspective(2200px) rotateX(2.6deg);transform-origin:top center
 }
-.note b{color:var(--ink);font-weight:620}
-.note code{display:block;font-family:var(--mono);font-size:12.5px;background:var(--bg);
-  border-radius:6px;padding:8px 11px;margin-top:9px;color:var(--ink);overflow-x:auto}
+.stage-inner img{width:100%}
+.stage-fade{
+  position:absolute;left:0;right:0;bottom:0;height:34%;
+  background:linear-gradient(transparent,var(--n-bg));pointer-events:none
+}
 
-/* ---------- features ---------- */
-.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(248px,1fr))}
-.card{background:var(--panel);border:1px solid var(--rule);border-radius:13px;padding:22px}
-.card h3{font-size:16px;font-weight:640;margin-bottom:7px}
-.card p{margin:0;color:var(--ink-soft);font-size:14.5px}
-.card .ic{font-size:19px;margin-bottom:12px;display:block}
+/* ---------- panels ---------- */
+.panel{position:relative;padding:clamp(76px,9vw,132px) 0}
+.panel-paper{
+  background:var(--p-bg);color:var(--p-ink);
+  border-radius:var(--round) var(--round) 0 0;margin-top:-1px
+}
+.panel-paper + .panel-night{border-radius:var(--round) var(--round) 0 0;margin-top:calc(-1*var(--round))}
+.panel-night{background:var(--n-bg);color:var(--n-ink);position:relative;overflow:clip;isolation:isolate}
+.panel-night .glow{
+  position:absolute;z-index:-1;left:-14%;top:8%;width:66%;height:70%;border-radius:50%;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(224,160,106,.20),transparent 68%);
+  pointer-events:none
+}
+.head{max-width:62ch;margin-bottom:clamp(40px,5vw,64px)}
+.head .lede{margin-top:20px}
+.panel-paper .eyebrow{color:var(--accent-deep)}
+.panel-paper .lede{color:var(--p-soft)}
+.panel-night .eyebrow{color:var(--accent)}
+.panel-night .lede{color:var(--n-soft)}
+
+/* ---------- feature cards ---------- */
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(268px,1fr))}
+.card{
+  background:var(--p-page);border-radius:22px;padding:30px 28px 32px;
+  display:flex;flex-direction:column;gap:11px
+}
+.card .ico{width:34px;height:34px;color:var(--accent-deep);margin-bottom:8px}
+.card p{margin:0;color:var(--p-soft);font-size:15.5px;line-height:1.55;text-wrap:pretty}
+.card code{font-family:var(--mono);font-size:.86em;background:rgba(0,0,0,.05);padding:1px 5px;border-radius:5px}
+
+/* ---------- split section (headline + pills + shot) ---------- */
+.split{display:grid;gap:clamp(36px,5vw,72px);grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);align-items:center}
+@media (max-width:900px){.split{grid-template-columns:1fr}}
+.pills{display:flex;flex-direction:column;gap:8px;margin-top:34px;align-items:flex-start}
+.pill{
+  display:flex;align-items:center;gap:11px;padding:11px 20px 11px 16px;border-radius:999px;
+  font-size:15.5px;font-weight:500;color:var(--n-soft);background:rgba(255,255,255,.045);
+  transition:.18s;text-align:left
+}
+.pill:hover{background:rgba(224,160,106,.13);color:var(--n-ink)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:0 0 auto;opacity:.75}
+.shot{
+  border-radius:clamp(14px,1.4vw,20px);overflow:hidden;border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.8)
+}
 
 /* ---------- builds ---------- */
-.builds{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.build{background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:26px;
-  display:flex;flex-direction:column}
-.build.featured{border-color:var(--accent-deep);background:linear-gradient(180deg,var(--accent-soft),var(--panel) 58%)}
-.build h3{font-size:19px;margin-bottom:4px}
-.build .sub{color:var(--ink-faint);font-size:13px;margin-bottom:16px}
-.build ul{list-style:none;padding:0;margin:0 0 22px;font-size:14.5px;color:var(--ink-soft)}
-.build li{padding:5px 0 5px 22px;position:relative}
-.build li::before{content:"›";position:absolute;left:4px;color:var(--accent);font-weight:700}
+.builds{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.build{border-radius:26px;padding:clamp(28px,3vw,40px);display:flex;flex-direction:column}
+.build.desk{background:linear-gradient(165deg,#20222a,#17181c 62%);border:1px solid rgba(224,160,106,.24)}
+.build.lite{background:var(--n-panel);border:1px solid var(--n-rule)}
+.build .tag{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.build.lite .tag{color:var(--n-faint)}
+.build h3{font-size:26px;letter-spacing:-.03em;margin-bottom:8px}
+.build .sub{color:var(--n-faint);font-size:14.5px;margin-bottom:24px}
+.build ul{list-style:none;margin:0 0 30px;padding:0;display:flex;flex-direction:column;gap:11px}
+.build li{display:flex;gap:11px;align-items:flex-start;color:var(--n-soft);font-size:15.5px;line-height:1.45}
+.build li svg{width:16px;height:16px;flex:0 0 auto;margin-top:3px;color:var(--accent);opacity:.9}
 .build .btn{align-self:flex-start;margin-top:auto}
 
-/* ---------- table ---------- */
-.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--panel)}
-table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:520px}
-th,td{padding:11px 16px;text-align:left;border-bottom:1px solid var(--rule)}
-th{font-weight:620;color:var(--ink);background:var(--panel-2);font-size:13px;
-  text-transform:uppercase;letter-spacing:.05em}
-td:not(:first-child){text-align:center;width:130px}
-tr:last-child td{border-bottom:0}
-.yes{color:#6fbf87;font-weight:700}
-.no{color:var(--ink-faint)}
+/* ---------- download band ---------- */
+.download{text-align:center}
+.download .btn{margin-top:8px}
+.gate{
+  display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;text-align:left;
+  max-width:660px;margin:36px auto 0;background:var(--n-panel);border:1px solid var(--n-rule);
+  border-radius:20px;padding:22px 24px
+}
+.gate svg{width:22px;height:22px;color:var(--accent);margin-top:2px}
+.gate p{margin:0;font-size:15px;color:var(--n-soft);line-height:1.55}
+.gate b{color:var(--n-ink);font-weight:600}
+.gate code{
+  display:block;font-family:var(--mono);font-size:12.5px;color:var(--n-ink);
+  background:#101114;border-radius:10px;padding:11px 14px;margin-top:12px;overflow-x:auto
+}
+.sha{margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--n-faint);word-break:break-all}
 
-footer{border-top:1px solid var(--rule);padding:40px 0 60px;color:var(--ink-faint);font-size:14px}
-footer .wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
-footer a{color:var(--ink-soft)}
-footer .right{margin-left:auto}
+/* ---------- footer ---------- */
+footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-rule)}
+.foot{display:flex;flex-wrap:wrap;gap:22px;align-items:center;font-size:14.5px;color:var(--n-faint)}
+.foot .name{display:flex;align-items:center;gap:9px;font-weight:600;color:var(--n-ink);letter-spacing:-.02em}
+.foot .name img{width:22px;height:22px;border-radius:7px}
+.foot nav{position:static;transform:none;background:none;box-shadow:none;padding:0;backdrop-filter:none}
+.foot a{color:var(--n-soft);transition:.15s}
+.foot a:hover{color:var(--accent)}
+.foot .right{margin-left:auto;display:flex;gap:20px;flex-wrap:wrap}
+
+@media (max-width:640px){
+  .hero{padding-top:132px}
+  .stage-inner{transform:none}
+  .gate{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .btn:hover{transform:none}
+}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="wrap">
-    <a class="brand" href="#top"><img src="assets/icon.png" alt=""> Inkwell</a>
-    <nav>
-      <a class="hide-sm" href="#features">Features</a>
-      <a class="hide-sm" href="#builds">Builds</a>
-      <a href="try.html">Try it</a>
-      <a href="https://github.com/royvillasana/inkwell">GitHub</a>
-    </nav>
-  </div>
-</header>
+<nav>
+  <a class="name" href="#top"><img src="assets/icon.png" alt=""> Inkwell</a>
+  <span class="links">
+    <a class="opt" href="#features">Features</a>
+    <a class="opt" href="#builds">Builds</a>
+    <a href="try.html">Try it</a>
+  </span>
+  <a class="get" href="#download">Download</a>
+</nav>
 
-<section class="hero" id="top">
-  <div class="wrap">
-    <h1>Write markdown that <em>looks finished</em></h1>
-    <p class="tag">The block under your caret shows its markdown source. Everything else stays
-      rendered. Click away and the syntax disappears again — that is the whole idea.</p>
-
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/royvillasana/inkwell/releases/download/v2.0.0/Inkwell-2.0.0-arm64.dmg">
+<!-- ============================ hero ============================ -->
+<header class="hero" id="top">
+  <div class="wrap hero-copy">
+    <h1>See your words,<br>not the <em class="acc">syntax</em></h1>
+    <p class="lede">Inkwell reveals markdown source only for the block you are editing.
+      Everything else stays finished prose — click away and the asterisks disappear.</p>
+    <div class="hero-cta">
+      <a class="btn btn-amber" href="#download">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 12l5 5 5-5"/><path d="M4 20h16"/></svg>
         Download for Mac
       </a>
-      <a class="btn ghost" href="try.html">Try it in your browser</a>
+      <a class="btn btn-line" href="try.html">Try it in your browser</a>
     </div>
-    <p class="meta">macOS 11+ · Apple Silicon · 116 MB · free and open source</p>
-
-    <div class="note">
-      <span>⚠️</span>
-      <div>
-        <b>First launch on macOS.</b> This build is not signed with an Apple Developer ID, so
-        Gatekeeper will block it. Drag Inkwell to Applications, then <b>right-click the app and
-        choose Open</b> — or clear the quarantine flag once:
-        <code>xattr -dr com.apple.quarantine /Applications/Inkwell.app</code>
-      </div>
-    </div>
+    <p class="hero-note">Free and open source · no accounts · no telemetry · your notes stay plain files</p>
   </div>
 
-  <div class="shot">
-    <img src="assets/screenshot.png" alt="Inkwell with a vault open, showing the file tree, outline and a rendered note" width="2360" height="1640">
+  <div class="stage">
+    <div class="stage-inner">
+      <img src="assets/screenshot.png" alt="Inkwell with a vault open: file tree on the left, a rendered note in the centre" width="2360" height="1640">
+      <div class="stage-fade"></div>
+    </div>
   </div>
-</section>
+</header>
 
-<section id="features">
+<!-- ============================ features ============================ -->
+<section class="panel panel-paper" id="features">
   <div class="wrap">
-    <h2>What it does</h2>
-    <p class="lede">Everything below works offline. No accounts, no telemetry, no network calls —
-      your notes are plain markdown files on your own disk.</p>
+    <div class="head">
+      <div class="eyebrow">What it does</div>
+      <h2>A notebook that keeps <em class="acc">out of the way</em></h2>
+      <p class="lede">Everything here works offline. Your notes are plain markdown files in a
+        folder you chose — no database, no sync service, nothing to lock you in.</p>
+    </div>
 
-    <div class="grid">
+    <div class="cards">
       <div class="card">
-        <span class="ic">📁</span>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         <h3>Vaults</h3>
         <p>Open a folder and get a real file tree, search across every note, tags, and
           <code>[[wiki links]]</code> that resolve — with backlinks showing what points here.</p>
       </div>
       <div class="card">
-        <span class="ic">⤳</span>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="6" rx="1.6"/><rect x="14" y="15" width="7" height="6" rx="1.6"/><path d="M6.5 9v4a2 2 0 0 0 2 2H14"/></svg>
         <h3>Real diagrams</h3>
         <p>Mermaid is bundled, not approximated: flowchart, sequence, class, state, ER, gantt,
           pie, journey, mindmap and gitGraph.</p>
       </div>
       <div class="card">
-        <span class="ic">∑</span>
-        <h3>Real maths</h3>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5h11l-6.5 7L16 19H5"/><path d="M19 5v14"/></svg>
+        <h3>Real mathematics</h3>
         <p>KaTeX with the mhchem extension. Fractions, matrices, aligned environments and
-          chemistry all render as you type.</p>
+          chemistry render as you type.</p>
       </div>
       <div class="card">
-        <span class="ic">⤓</span>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
         <h3>Export anywhere</h3>
-        <p>HTML, PDF, Word and plain text out of the box. Install Pandoc and docx, LaTeX, EPUB,
-          RTF, reStructuredText and MediaWiki appear too.</p>
+        <p>HTML, PDF, Word and plain text out of the box. Add Pandoc and docx, LaTeX, EPUB,
+          RTF and reStructuredText appear too.</p>
       </div>
       <div class="card">
-        <span class="ic">⌘</span>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2.4"/><path d="M8 9h8M8 13h5"/></svg>
         <h3>Fast to drive</h3>
-        <p>Command palette, quick open, slash menu for blocks, auto-pairing, table tools and
-          find-and-replace with regex.</p>
+        <p>Command palette, quick open, a slash menu for blocks, auto-pairing, table tools and
+          find-and-replace with regular expressions.</p>
       </div>
       <div class="card">
-        <span class="ic">🕘</span>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>
         <h3>Never lose work</h3>
         <p>Autosave to disk, file watching with conflict prompts, and version history you can
-          walk back through — one snapshot per save.</p>
+          walk back through — a snapshot on every save.</p>
       </div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap">
-    <h2>Diagrams and equations, rendered inline</h2>
-    <p class="lede">Both libraries ship inside the app and load from disk, so a diagram renders
-      the same on a plane as it does at your desk.</p>
-    <div class="shot" style="margin:0;padding:0">
+<!-- ============================ diagrams ============================ -->
+<section class="panel panel-night">
+  <div class="glow"></div>
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow">Rendered inline</div>
+      <h2>Diagrams and equations, <em class="acc">as you type</em></h2>
+      <div class="pills">
+        <span class="pill"><span class="dot"></span>Sequence, state, class and ER diagrams</span>
+        <span class="pill"><span class="dot"></span>Gantt charts, pie, mindmaps, gitGraph</span>
+        <span class="pill"><span class="dot"></span>Full LaTeX, including chemistry</span>
+        <span class="pill"><span class="dot"></span>Baked into every PDF and HTML export</span>
+      </div>
+    </div>
+    <div class="shot">
       <img src="assets/diagrams.png" alt="A Mermaid sequence diagram and KaTeX equations rendered inside Inkwell" width="2360" height="1640">
     </div>
   </div>
 </section>
 
-<section id="builds">
+<!-- ============================ builds ============================ -->
+<section class="panel panel-paper" id="builds">
   <div class="wrap">
-    <h2>Two builds</h2>
-    <p class="lede">The same editor and the same markdown engine. They differ in what the
-      surrounding application is allowed to do.</p>
+    <div class="head">
+      <div class="eyebrow">Two builds</div>
+      <h2>One editor, <em class="acc">two shapes</em></h2>
+      <p class="lede">The same editing model and the same markdown engine. They differ only in
+        what the surrounding application is allowed to do.</p>
+    </div>
+  </div>
 
-    <div class="builds">
-      <div class="build featured">
-        <h3>Desktop</h3>
-        <div class="sub">Electron · macOS Apple Silicon</div>
+  <div class="wrap" style="margin-top:-8px">
+    <div class="builds" style="color:var(--n-ink)">
+      <div class="build desk">
+        <div class="tag">Desktop</div>
+        <h3>The full editor</h3>
+        <div class="sub">macOS · Apple Silicon · 117 MB</div>
         <ul>
-          <li>Reads and writes real files</li>
-          <li>Vaults, search, backlinks</li>
-          <li>Real Mermaid and KaTeX</li>
-          <li>Pandoc export formats</li>
-          <li>Autosave and version history</li>
-          <li>Native menus, tabs, windows</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Reads and writes real files, with autosave</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Vaults, vault-wide search, backlinks</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Real Mermaid and real KaTeX</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Pandoc export formats</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Native menus, tabs and windows</li>
         </ul>
-        <a class="btn primary" href="https://github.com/royvillasana/inkwell/releases/download/v2.0.0/Inkwell-2.0.0-arm64.dmg">Download the DMG</a>
+        <a class="btn btn-amber" href="#download">Download the DMG</a>
       </div>
 
-      <div class="build">
-        <h3>Light</h3>
-        <div class="sub">One HTML file · 155 KB · any browser</div>
+      <div class="build lite">
+        <div class="tag">Light</div>
+        <h3>One HTML file</h3>
+        <div class="sub">Any browser · 155 KB · nothing to install</div>
         <ul>
-          <li>The entire editor in one file</li>
-          <li>No install, no server, no build</li>
-          <li>Works straight from your disk</li>
-          <li>Saves back to file in Chrome and Edge</li>
-          <li>Email it to someone and it just works</li>
-          <li>Zero dependencies</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>The entire editor in a single file</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>No server, no build step, zero dependencies</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Runs straight from your disk</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Saves back to file in Chrome and Edge</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Email it to someone and it just works</li>
         </ul>
-        <a class="btn ghost" href="try.html">Open it now</a>
+        <a class="btn btn-line" href="try.html">Open it now</a>
       </div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap">
-    <h2>Which one do I want?</h2>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>&nbsp;</th><th>Light</th><th>Desktop</th></tr></thead>
-        <tbody>
-          <tr><td>Live block preview</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td>Tables, task lists, footnotes, <code>[TOC]</code></td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td>Tabs, split view, presentation mode</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td>Full Mermaid diagram set</td><td class="no">partial</td><td class="yes">✓</td></tr>
-          <tr><td>Full LaTeX via KaTeX</td><td class="no">partial</td><td class="yes">✓</td></tr>
-          <tr><td>Folder of notes with search</td><td class="no">—</td><td class="yes">✓</td></tr>
-          <tr><td>Backlinks across notes</td><td class="no">—</td><td class="yes">✓</td></tr>
-          <tr><td>Autosave and file watching</td><td class="no">—</td><td class="yes">✓</td></tr>
-          <tr><td>docx, LaTeX, EPUB export</td><td class="no">—</td><td class="yes">✓</td></tr>
-          <tr><td>Runs with no install</td><td class="yes">✓</td><td class="no">—</td></tr>
-        </tbody>
-      </table>
+<!-- ============================ download ============================ -->
+<section class="panel panel-night" id="download">
+  <div class="glow" style="left:auto;right:-16%;top:0"></div>
+  <div class="wrap download">
+    <div class="eyebrow" style="justify-content:center">Get Inkwell</div>
+    <h2>Start writing in <em class="acc">about a minute</em></h2>
+    <div class="hero-cta">
+      <a class="btn btn-amber" href="https://github.com/royvillasana/inkwell/releases/download/v2.0.0/Inkwell-2.0.0-arm64.dmg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 12l5 5 5-5"/><path d="M4 20h16"/></svg>
+        Inkwell 2.0.0 for Mac
+      </a>
+      <a class="btn btn-line" href="https://github.com/royvillasana/inkwell">View the source</a>
     </div>
-  </div>
-</section>
+    <p class="hero-note">macOS 11 or later · Apple Silicon · MIT licensed</p>
 
-<section>
-  <div class="wrap">
-    <h2>Built to be inspected</h2>
-    <p class="lede">The markdown parser, the block editor, the maths fallback and the flowchart
-      renderer in the light build are all hand-written and readable. In the desktop app the
-      renderer runs sandboxed with context isolation on and a content-security policy that
-      allows scripts from the app itself only — it has no <code>require</code>, no
-      <code>fs</code>, and no direct IPC. Deletes go to the system Trash and saves are written
-      to a temp file and renamed, so a crash cannot truncate a note.</p>
-    <div class="cta" style="justify-content:flex-start">
-      <a class="btn ghost" href="https://github.com/royvillasana/inkwell">Read the source</a>
-      <a class="btn ghost" href="https://github.com/royvillasana/inkwell/releases">All releases</a>
+    <div class="gate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 9v5"/><path d="M12 17.5v.01"/><path d="M10.3 3.9 2.4 17.4A2 2 0 0 0 4.1 20.4h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <p>
+        <b>First launch.</b> This build is not signed with an Apple Developer ID, so macOS will
+        block it. Drag Inkwell to Applications, then <b>right-click the app and choose Open</b> —
+        or clear the quarantine flag once:
+        <code>xattr -dr com.apple.quarantine /Applications/Inkwell.app</code>
+        <span class="sha">SHA-256 169895c291c0e300023f00c261a251492ed8c6c03ca91195cee971269ab7e474</span>
+      </p>
     </div>
   </div>
 </section>
 
 <footer>
-  <div class="wrap">
-    <span>Inkwell — MIT licensed</span>
-    <a href="https://github.com/royvillasana/inkwell">GitHub</a>
-    <a href="https://github.com/royvillasana/inkwell/issues">Report a problem</a>
-    <span class="right">Built by <a href="https://github.com/royvillasana">royvillasana</a></span>
+  <div class="wrap foot">
+    <a class="name" href="#top"><img src="assets/icon.png" alt=""> Inkwell</a>
+    <span>MIT licensed</span>
+    <span class="right">
+      <a href="https://github.com/royvillasana/inkwell">GitHub</a>
+      <a href="https://github.com/royvillasana/inkwell/releases">Releases</a>
+      <a href="https://github.com/royvillasana/inkwell/issues">Report a problem</a>
+      <a href="try.html">Try in browser</a>
+    </span>
   </div>
 </footer>
 
