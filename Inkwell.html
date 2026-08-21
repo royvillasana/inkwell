@@ -1776,6 +1776,8 @@ function buildOutline(){
     b.onclick = () => {
       const el = blockEls(h.id);
       if (el) { el.scrollIntoView({ block: "start", behavior: "smooth" }); activate(h.id); }
+      /* jumping to a heading you cannot see behind the overlay is no jump */
+      if (narrowScreen()) toggleSidebar(false, true);
     };
     toc.appendChild(b);
   });
@@ -1905,6 +1907,8 @@ async function buildTree(){
       adoptDocument(await file.text(), file.name, f.handle);
       $$(".tree-item").forEach(x => x.classList.remove("on"));
       b.classList.add("on");
+      /* the overlay covers what you just opened, so step aside for it */
+      if (narrowScreen()) toggleSidebar(false, true);
     };
     tree.appendChild(b);
   }
@@ -2005,12 +2009,24 @@ function setPane(name){
   $$(".side-tabs button").forEach(b => b.classList.toggle("on", b.dataset.pane === name));
   $$(".side-pane").forEach(p => p.classList.toggle("on", p.id === "pane-" + name));
 }
-function toggleSidebar(v){
-  prefs.sidebar = v == null ? !prefs.sidebar : v;
-  document.body.classList.toggle("no-sidebar", !prefs.sidebar);
-  $("#btn-sidebar").classList.toggle("on", prefs.sidebar);
+/* What is on screen is tracked apart from what is stored. A phone starts with
+   the sidebar closed because of the width of the window, not because anyone
+   asked for that, so it must not overwrite the preference a desktop visit left
+   behind. Mutating prefs.sidebar and merely skipping persist() is not enough —
+   the next unrelated save would write the mutated value out. */
+let sidebarShown = prefs.sidebar !== false;
+function toggleSidebar(v, quiet){
+  sidebarShown = v == null ? !sidebarShown : v;
+  document.body.classList.toggle("no-sidebar", !sidebarShown);
+  $("#btn-sidebar").classList.toggle("on", sidebarShown);
+  if (quiet) return;                 // width talking, not the visitor
+  prefs.sidebar = sidebarShown;
   persist();
 }
+
+/* Under 820px the sidebar stops sitting beside the text and floats over it,
+   264px wide — most of a phone screen. */
+const narrowScreen = () => window.matchMedia("(max-width:820px)").matches;
 function toggleFocus(){
   prefs.focus = !prefs.focus;
   document.body.classList.toggle("focus", prefs.focus);
@@ -2382,7 +2398,7 @@ const WELCOME = [
     document.documentElement.dataset.theme = wanted;
     $$(".theme-dot").forEach(d => d.classList.toggle("on", d.dataset.theme === wanted));
   }
-  toggleSidebar(prefs.sidebar !== false);
+  toggleSidebar(narrowScreen() ? false : prefs.sidebar !== false, narrowScreen());
   if (prefs.focus)      { prefs.focus = false; toggleFocus(); }
   if (prefs.typewriter) { prefs.typewriter = false; toggleTypewriter(); }
   if (prefs.wide)       { prefs.wide = false; toggleWide(); }
