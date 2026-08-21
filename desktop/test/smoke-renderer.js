@@ -124,13 +124,14 @@
      wordmark shares that row, which only works while those numbers agree. */
   if (document.body.classList.contains("mac")) {
     const brandRect = document.querySelector(".brand").getBoundingClientRect();
+    const sideRect = document.querySelector("#sidebar").getBoundingClientRect();
     const centreY = (brandRect.top + brandRect.bottom) / 2;
     check("the wordmark sits on the traffic lights' row", Math.abs(centreY - 21) <= 1.5,
       "centre y=" + Math.round(centreY));
-    check("the wordmark clears the traffic lights", brandRect.left >= 70,
-      "left=" + Math.round(brandRect.left));
-    check("and is not pushed off to the right", brandRect.left <= 96,
-      "left=" + Math.round(brandRect.left));
+    check("the wordmark sits at the far end of the sidebar",
+      sideRect.right - brandRect.right <= 18, "gap to edge=" + Math.round(sideRect.right - brandRect.right));
+    check("it keeps well clear of the traffic lights", brandRect.left - 66 >= 60,
+      "gap from lights=" + Math.round(brandRect.left - 66));
   }
 
   /* ---- the vault bar ----------------------------------------------------- */
