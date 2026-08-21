@@ -150,6 +150,13 @@ async function runSmoke(win){
     console.log("smoke: could not build the fixture vault: " + err.message);
   }
   prelude += "globalThis.__fakeUpdate = " + JSON.stringify(process.env.INKWELL_FAKE_UPDATE || null) + ";\n";
+  /* Bring the window forward before the checks run. Parts of the editor hide
+     themselves on blur — the floating menu most of all — so a window that never
+     came to the front fails checks for reasons that have nothing to do with
+     what they test. test:all launches two apps back to back, which is exactly
+     when one can start behind the other. */
+  try { app.focus({ steal: true }); win.focus(); } catch (err) { /* headless */ }
+  await new Promise(r => setTimeout(r, 150));
   try {
     const report = await win.webContents.executeJavaScript(prelude + script, true);
     console.log("SMOKE " + JSON.stringify(report, null, 2));
