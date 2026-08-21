@@ -72,11 +72,19 @@
   /* ---- rich text mode: the default view, and its three menus ---- */
   const R = await import("./js/rich-editor.js");
 
-  /* the bundle is a few hundred KB; give it a moment rather than racing it */
-  for (let i = 0; i < 40 && !R.isReady(); i++) await wait(100);
-  check("boots into rich text mode", R.isReady(), "rich editor not running");
-  check("body carries the rich mode class", document.body.classList.contains("mode-rich"));
+  check("boots into styled mode", !document.body.classList.contains("mode-rich")
+        && !document.body.classList.contains("mode-split")
+        && !document.body.classList.contains("mode-source"), document.body.className);
+  check("the styled button reads as active", document.querySelector("#btn-styled").classList.contains("on"));
   check("booting does not dirty the document", state.dirty === false, "dirty=" + state.dirty);
+
+  /* switch to rich text the way a person would, then wait for the bundle */
+  document.querySelector("#btn-rich").click();
+  for (let i = 0; i < 40 && !R.isReady(); i++) await wait(100);
+  check("the rich text button opens the editor", R.isReady(), "rich editor not running");
+  check("body carries the rich mode class", document.body.classList.contains("mode-rich"));
+  check("only the rich button is active", document.querySelector("#btn-rich").classList.contains("on")
+        && !document.querySelector("#btn-styled").classList.contains("on"));
   check("formatting lives in the menus, not the toolbar",
         !document.querySelector("#btn-bold") && !document.querySelector("#btn-italic") && !document.querySelector("#btn-link"));
 

@@ -5,6 +5,15 @@ const fsp = fs.promises;
 const path = require("path");
 const os = require("os");
 
+/* Automated runs get their own profile. This MUST happen before requiring
+   store, which resolves the settings path at module load: with the override
+   after the require, smoke runs were still reading and writing the real
+   profile — rewriting saved preferences and leaving scratch documents in the
+   restored session. */
+if (process.env.INKWELL_SMOKE) {
+  app.setPath("userData", path.join(os.tmpdir(), "inkwell-smoke-" + process.pid));
+}
+
 const store = require("./store");
 const files = require("./files");
 const search = require("./search");
@@ -12,13 +21,6 @@ const { buildMenu } = require("./menu");
 const pandoc = require("./pandoc");
 
 const isDev = process.argv.includes("--dev");
-
-/* Automated runs get their own profile. Sharing userData with the real app
-   meant a test that toggled a mode rewrote the user's saved preferences, and
-   left its scratch documents in their restored session. */
-if (process.env.INKWELL_SMOKE) {
-  app.setPath("userData", path.join(os.tmpdir(), "inkwell-smoke-" + process.pid));
-}
 const windows = new Set();
 let watcher = null;
 let watchTimer = null;
@@ -56,8 +58,19 @@ function createWindow(openPath){
 
   /* renderer console shows up in the terminal, which is what you want while
      developing and when a user sends you a log */
-  win.webContents.on("console-message", (e, level, message, line, source) => {
-    if (isDev || level >= 2) console.log("[renderer]", message, source ? "(" + source.split("/").pop() + ":" + line + ")" : "");
+  /* Electron 36+ passes a single event object; the old positional form silently
+     dropped every message, which made renderer errors invisible here. */
+  win.webContents.on("console-message", (...args) => {
+    const e = args[0];
+    const modern = e && typeof e === "object" && "message" in e;
+    const level = modern ? e.level : args[1];
+    const message = modern ? e.message : args[2];
+    const line = modern ? e.lineNumber : args[3];
+    const source = modern ? e.sourceId : args[4];
+    const bad = level === "error" || level === "warning" || (typeof level === "number" && level >= 2);
+    if (!isDev && !bad) return;
+    console.log("[renderer:" + level + "]", message,
+      source ? "(" + String(source).split("/").pop() + ":" + line + ")" : "");
   });
 
   win.webContents.on("did-finish-load", () => {

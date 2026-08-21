@@ -436,87 +436,101 @@ function toggleWide(){
   $("#btn-wide").style.color = prefs.wide ? "var(--accent)" : "";
   savePrefs();
 }
-function toggleSource(){
-  prefs.source = !prefs.source;
-  if (prefs.source && prefs.split) toggleSplit();
-  const src = $("#source");
-  if (prefs.source) {
-    commit();
-    src.value = serialize();
-    document.body.classList.add("mode-source");
-    $("#btn-src").classList.add("on");
-    src.focus();
-  } else {
-    document.body.classList.remove("mode-source");
-    $("#btn-src").classList.remove("on");
-    loadText(src.value, state.name, { path: state.path, mtime: state.mtime });
-    state.dirty = true;
-    updateStatus();
-  }
-}
-const toggleRich = () => setRich(!prefs.rich);
+/* ---- views ----------------------------------------------------------------
+   Styled, rich text, split and source are one choice, not four independent
+   flags. Holding them as separate booleans let them disagree — turning on
+   split while rich was up left the split panes hidden behind the rich surface,
+   because the rich mode class hides them. One value cannot contradict itself. */
+const VIEWS = ["styled", "rich", "split", "source"];
+const currentView = () => (VIEWS.includes(prefs.view) ? prefs.view : "styled");
 
-/* opts.silent: entering at startup must not mark a freshly opened file dirty */
-async function setRich(on, opts = {}){
-  if (on === prefs.rich && Rich9.isReady() === on) return;
-  prefs.rich = on;
-  const wasDirty = state.dirty;
-  if (prefs.rich) {
-    if (prefs.source) toggleSource();
-    if (prefs.split) toggleSplit();
+/* the text as the view that is leaving would write it */
+function textOfView(view){
+  if (view === "rich") return Rich9.isReady() ? Rich9.getMarkdown() : null;
+  if (view === "source") return $("#source").value;
+  if (view === "split") return $("#split-src").value;
+  return serialize();
+}
+
+async function setView(next, opts = {}){
+  if (!VIEWS.includes(next)) next = "styled";
+  const cur = currentView();
+  if (next === cur && (next !== "rich" || Rich9.isReady())) return;
+
+  const before = serialize();
+
+  /* --- leave --- */
+  if (cur === "rich" && Rich9.isReady()) {
+    const md = Rich9.getMarkdown();
+    Rich9.close();
+    if (md != null) loadText(md, state.name, { path: state.path, mtime: state.mtime });
+  } else if (cur === "source" || cur === "split") {
+    loadText(textOfView(cur), state.name, { path: state.path, mtime: state.mtime });
+  } else {
     commit();
-    const md = serialize();
+  }
+  document.body.classList.remove("mode-rich", "mode-source", "mode-split");
+
+  /* Only a real change to the text counts. Round-tripping through a view can
+     normalise markdown, but simply looking at a document must not dirty it. */
+  const after = serialize();
+  if (after !== before) state.dirty = true;
+  else if (opts.keepDirty !== false) state.dirty = state.dirty;
+
+  /* --- enter --- */
+  prefs.view = next;
+  prefs.rich = next === "rich";
+  prefs.source = next === "source";
+  prefs.split = next === "split";
+
+  if (next === "rich") {
     document.body.classList.add("mode-rich");
-    $("#btn-rich").classList.add("on");
     try {
-      await Rich9.open($("#richwrap"), md, {
+      await Rich9.open($("#richwrap"), serialize(), {
         spellcheck: prefs.spellcheck,
         onChange: () => { state.dirty = true; updateStatus(); scheduleAutosave(); }
       });
-      Rich9.setLinkAsker((prev, opts) => askText(
-        (opts && opts.title === "Image") ? "Where is the image?" : "Where should this link point?",
+      Rich9.setLinkAsker((prev, o) => askText(
+        (o && o.title === "Image") ? "Where is the image?" : "Where should this link point?",
         prev,
-        Object.assign({ title: "Link", label: "URL", ok: "Apply", placeholder: "https://" }, opts || {})));
+        Object.assign({ title: "Link", label: "URL", ok: "Apply", placeholder: "https://" }, o || {})));
     } catch (err) {
-      prefs.rich = false;
-      document.body.classList.remove("mode-rich");
-      $("#btn-rich").classList.remove("on");
       console.error("rich text mode:", err);
+      document.body.classList.remove("mode-rich");
+      prefs.view = "styled"; prefs.rich = false;
       if (!opts.silent) say("The rich text editor could not start: " + err.message, "Rich text unavailable");
-      return;
     }
-    if (opts.silent) state.dirty = wasDirty;
-  } else {
-    const md = Rich9.getMarkdown();
-    Rich9.close();
-    document.body.classList.remove("mode-rich");
-    $("#btn-rich").classList.remove("on");
-    if (md != null) {
-      loadText(md, state.name, { path: state.path, mtime: state.mtime });
-      if (!opts.silent) state.dirty = true;
-    }
-  }
-  updateStatus();
-  savePrefs();
-}
-
-let splitTimer = null;
-function toggleSplit(){
-  prefs.split = !prefs.split;
-  if (prefs.split && prefs.source) toggleSource();
-  document.body.classList.toggle("mode-split", prefs.split);
-  $("#btn-split").classList.toggle("on", prefs.split);
-  if (prefs.split) {
-    commit();
+  } else if (next === "source") {
+    document.body.classList.add("mode-source");
+    $("#source").value = serialize();
+    $("#source").focus();
+  } else if (next === "split") {
+    document.body.classList.add("mode-split");
     $("#split-src").value = serialize();
     paintSplit();
     $("#split-src").focus();
-  } else {
-    loadText($("#split-src").value, state.name, { path: state.path, mtime: state.mtime });
-    state.dirty = true;
-    updateStatus();
   }
+
+  refreshViewButtons();
+  updateStatus();
+  if (!opts.silent) savePrefs();
 }
+
+function refreshViewButtons(){
+  const v = currentView();
+  const map = { styled: "#btn-styled", rich: "#btn-rich", split: "#btn-split", source: "#btn-src" };
+  Object.keys(map).forEach(name => {
+    const el = $(map[name]);
+    if (el) el.classList.toggle("on", name === v);
+  });
+}
+
+/* the shortcuts and menu items toggle back to styled, which is the home view */
+const toggleRich   = () => setView(currentView() === "rich"   ? "styled" : "rich");
+const toggleSource = () => setView(currentView() === "source" ? "styled" : "source");
+const toggleSplit  = () => setView(currentView() === "split"  ? "styled" : "split");
+
+let splitTimer = null;
 function paintSplit(){
   $("#split-prev").innerHTML = '<div class="rendered">' + renderDoc($("#split-src").value) + "</div>";
   Rich.hydrate($("#split-prev"));
@@ -737,7 +751,7 @@ function savePrefs(){
     sidebar: prefs.sidebar, focus: prefs.focus, typewriter: prefs.typewriter, wide: prefs.wide,
     lineNumbers: prefs.lineNumbers, autopair: prefs.autopair, spellcheck: prefs.spellcheck,
     goal: prefs.goal, autosave: prefs.autosave, autosaveDelay: prefs.autosaveDelay,
-    rich: prefs.rich,
+    view: currentView(),
     smartPunctuation: prefs.smartPunctuation, pasteAsMarkdown: prefs.pasteAsMarkdown,
     numberHeadings: prefs.numberHeadings
   }).catch(() => {});
@@ -827,6 +841,7 @@ const COMMANDS = [
   { name: "Search the vault", key: "⇧⌘F", run: () => { toggleSidebar(true); setPane("search"); } },
   { name: "Find & replace", key: "⌘F", run: () => openFind(true) },
   { name: "Source mode", key: "⌘/", run: () => toggleSource() },
+  { name: "Styled mode — the block editor", key: "", run: () => setView("styled") },
   { name: "Rich text mode", key: "⌘R", run: () => toggleRich() },
   { name: "Split view", key: "⇧⌘E", run: () => toggleSplit() },
   { name: "Focus mode", key: "⇧⌘F", run: () => toggleFocus() },
@@ -1046,6 +1061,7 @@ const MENU = {
   "source": () => toggleSource(),
   "split": () => toggleSplit(),
   "rich": () => toggleRich(),
+  "styled": () => setView("styled"),
   "focus": () => toggleFocus(),
   "typewriter": () => toggleTypewriter(),
   "present": () => startPresentation(),
@@ -1163,10 +1179,11 @@ async function boot(){
   if (prefs.focus) { prefs.focus = false; toggleFocus(); }
   if (prefs.typewriter) { prefs.typewriter = false; toggleTypewriter(); }
   if (prefs.wide) { prefs.wide = false; toggleWide(); }
+  /* Styled is the home view. Whatever was last chosen comes back, but nothing
+     is restored into split or source — those are things you step into. */
   prefs.source = false; prefs.split = false;
-  /* Rich text is the default view: the floating menu is what makes the blocks
-     discoverable, and it only exists here. An explicit opt-out is remembered. */
-  if (prefs.rich === undefined) prefs.rich = true;
+  const wantView = prefs.view === "rich" ? "rich" : "styled";
+  prefs.view = "styled"; prefs.rich = false;
   applyPrefs();
 
   if (prefs.followSystemTheme) {
@@ -1198,7 +1215,8 @@ async function boot(){
   updateStatus();
 
   /* after the document is in place, so the editor opens with real content */
-  if (prefs.rich) { prefs.rich = false; await setRich(true, { silent: true }); }
+  refreshViewButtons();
+  if (wantView === "rich") await setView("rich", { silent: true });
 
   wireUI();
   api.on.menu(({ cmd, arg }) => {
@@ -1225,6 +1243,7 @@ function wireUI(){
   $("#btn-newnote").onclick = () => V.newNote(V.vault.root);
   $("#btn-find").onclick = () => openFind(!$("#find").classList.contains("on"));
   $("#btn-focus").onclick = () => toggleFocus();
+  $("#btn-styled").onclick = () => setView("styled");
   $("#btn-rich").onclick = () => toggleRich();
   $("#btn-split").onclick = () => toggleSplit();
   $("#btn-present").onclick = () => startPresentation();
