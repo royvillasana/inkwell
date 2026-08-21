@@ -229,3 +229,12 @@ body.mode-rich #richwrap{display:block}
 }
 #tip.on{opacity:.97}
 @media (prefers-reduced-motion:reduce){ #tip{transition:none} }
+
+/* ---------- Renaming the document in place ---------- */
+#docname{cursor:default}
+#docname b.editing{
+  display:inline-block;min-width:2ch;padding:1px 7px;margin:-1px -1px;
+  border-radius:6px;outline:none;cursor:text;
+  background:var(--page);box-shadow:0 0 0 1px var(--accent) inset;
+  -webkit-user-select:text;user-select:text
+}

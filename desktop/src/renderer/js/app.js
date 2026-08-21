@@ -286,7 +286,9 @@ function updateStatus(){
   $("#st-chars").textContent = text.length.toLocaleString();
   $("#st-lines").textContent = text.split("\n").length.toLocaleString();
   $("#st-read").textContent = Math.max(1, Math.round(words / 220));
-  $("#docname").innerHTML = "<b>" + esc(state.name) + "</b>" + (state.dirty ? ' <span class="dirty">•</span>' : "");
+  /* repainting mid-edit would swallow what is being typed */
+  if (!renamingInline)
+    $("#docname").innerHTML = "<b>" + esc(state.name) + "</b>" + (state.dirty ? ' <span class="dirty">•</span>' : "");
   drawGoal(words);
   buildOutline();
   markTitle();
@@ -926,11 +928,64 @@ async function copyAs(kind){
   toast(ok ? "Copied as rich text" : "Could not reach the clipboard");
 }
 
-/* ------------------------------------------------------------------ misc */
-async function renameDoc(){
-  const v = await askText("Give this document a new file name.", state.name, { title: "Rename", label: "File name", ok: "Rename" });
-  if (!v) return;
-  const next = /\.[a-z0-9]+$/i.test(v) ? v : v + ".md";
+/* ---- renaming in place ---------------------------------------------------
+   Double-click the title and edit it where it sits. The dialog is still there
+   for the menu and palette, but nobody should need it to change a name. */
+let renamingInline = false;
+
+function startInlineRename(){
+  if (renamingInline) return;
+  const host = $("#docname");
+  const before = state.name;
+
+  renamingInline = true;
+  host.innerHTML = "<b></b>";
+  const field = host.querySelector("b");
+  field.textContent = before;
+  field.contentEditable = "plaintext-only";
+  field.spellcheck = false;
+  field.classList.add("editing");
+  field.focus();
+
+  /* select the name but not the extension, the way a file manager does */
+  const dot = before.lastIndexOf(".");
+  const node = field.firstChild;
+  const range = document.createRange();
+  range.setStart(node, 0);
+  range.setEnd(node, dot > 0 ? dot : before.length);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  let settled = false;
+  const finish = async commit => {
+    if (settled) return;
+    settled = true;
+    field.contentEditable = "false";
+    field.classList.remove("editing");
+    const typed = (field.textContent || "").replace(/[\r\n]+/g, " ").trim();
+    renamingInline = false;
+
+    if (!commit || !typed || typed === before) { updateStatus(); return; }
+    await applyRename(typed);
+  };
+
+  field.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+    e.stopPropagation();          // ⌘R and friends should not fire while typing a name
+  });
+  field.addEventListener("blur", () => finish(true));
+}
+
+/* Shared by the inline editor and the dialog. */
+async function applyRename(value){
+  /* a name is a name, not a path */
+  const clean = value.replace(/[\\/:]+/g, "-").trim();
+  if (!clean) return;
+  const next = /\.[a-z0-9]+$/i.test(clean) ? clean : clean + ".md";
+  if (next === state.name) return;
+
   if (state.path) {
     try {
       const f = await api.file.rename(state.path, next);
@@ -939,7 +994,11 @@ async function renameDoc(){
       if (d) { d.path = f.path; d.name = f.name; }
       await V.refreshVault();
       V.setActivePath(state.path);
-    } catch (err) { return say(err.message, "Rename failed"); }
+    } catch (err) {
+      say(err.message, "Rename failed");
+      updateStatus();
+      return;
+    }
   } else {
     state.name = next;
     const d = docs.find(x => x.id === curDoc);
@@ -949,6 +1008,12 @@ async function renameDoc(){
   renderTabs();
   updateStatus();
   toast("Renamed to " + state.name);
+}
+
+/* ------------------------------------------------------------------ misc */
+async function renameDoc(){
+  const v = await askText("Give this document a new file name.", state.name, { title: "Rename", label: "File name", ok: "Rename" });
+  if (v) await applyRename(v);
 }
 
 async function insertImage(){
@@ -1254,8 +1319,8 @@ function wireUI(){
   $("#btn-wide").onclick = () => toggleWide();
   $("#btn-prefs").onclick = () => settingsDialog();
   $("#btn-help").onclick = () => openPalette("commands");
-  $("#docname").onclick = () => renameDoc();
-  $("#docname").title = "Click to rename";
+  $("#docname").ondblclick = () => startInlineRename();
+  $("#docname").dataset.tip = "Double-click to rename";
 
   $$(".side-tabs button").forEach(b => { b.onclick = () => setPane(b.dataset.pane); });
   $$(".theme-dot").forEach(d => { d.onclick = () => setTheme(d.dataset.theme); });
