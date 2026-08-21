@@ -92,11 +92,13 @@
   {
     const tt = R.instance();
     tt.chain().focus().setTextSelection(tt.state.doc.content.size - 1).splitBlock().run();
-    await wait(260);
+    /* poll rather than guess: a cold packaged start is slower than the dev one,
+       and a fixed wait made this check flaky */
+    for (let i = 0; i < 25 && !R.floatingMenuVisible(); i++) await wait(60);
     check("floating menu shows on an empty line", R.floatingMenuVisible());
 
     tt.chain().focus().insertContent("/tab").run();
-    await wait(260);
+    for (let i = 0; i < 25 && !R.slashMenuVisible(); i++) await wait(60);
     check("slash menu opens and filters", R.slashMenuVisible()
       && document.querySelectorAll("#rich-slash .si").length === 1,
       document.querySelectorAll("#rich-slash .si").length + " items");
