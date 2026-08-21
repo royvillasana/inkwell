@@ -453,8 +453,13 @@ function toggleSource(){
     updateStatus();
   }
 }
-async function toggleRich(){
-  prefs.rich = !prefs.rich;
+const toggleRich = () => setRich(!prefs.rich);
+
+/* opts.silent: entering at startup must not mark a freshly opened file dirty */
+async function setRich(on, opts = {}){
+  if (on === prefs.rich && Rich9.isReady() === on) return;
+  prefs.rich = on;
+  const wasDirty = state.dirty;
   if (prefs.rich) {
     if (prefs.source) toggleSource();
     if (prefs.split) toggleSplit();
@@ -475,9 +480,11 @@ async function toggleRich(){
       prefs.rich = false;
       document.body.classList.remove("mode-rich");
       $("#btn-rich").classList.remove("on");
-      say("The rich text editor could not start: " + err.message, "Rich text unavailable");
+      console.error("rich text mode:", err);
+      if (!opts.silent) say("The rich text editor could not start: " + err.message, "Rich text unavailable");
       return;
     }
+    if (opts.silent) state.dirty = wasDirty;
   } else {
     const md = Rich9.getMarkdown();
     Rich9.close();
@@ -485,7 +492,7 @@ async function toggleRich(){
     $("#btn-rich").classList.remove("on");
     if (md != null) {
       loadText(md, state.name, { path: state.path, mtime: state.mtime });
-      state.dirty = true;
+      if (!opts.silent) state.dirty = true;
     }
   }
   updateStatus();
@@ -729,6 +736,7 @@ function savePrefs(){
     sidebar: prefs.sidebar, focus: prefs.focus, typewriter: prefs.typewriter, wide: prefs.wide,
     lineNumbers: prefs.lineNumbers, autopair: prefs.autopair, spellcheck: prefs.spellcheck,
     goal: prefs.goal, autosave: prefs.autosave, autosaveDelay: prefs.autosaveDelay,
+    rich: prefs.rich,
     smartPunctuation: prefs.smartPunctuation, pasteAsMarkdown: prefs.pasteAsMarkdown,
     numberHeadings: prefs.numberHeadings
   }).catch(() => {});
@@ -1111,7 +1119,10 @@ async function boot(){
   if (prefs.focus) { prefs.focus = false; toggleFocus(); }
   if (prefs.typewriter) { prefs.typewriter = false; toggleTypewriter(); }
   if (prefs.wide) { prefs.wide = false; toggleWide(); }
-  prefs.source = false; prefs.split = false; prefs.rich = false;
+  prefs.source = false; prefs.split = false;
+  /* Rich text is the default view: the floating menu is what makes the blocks
+     discoverable, and it only exists here. An explicit opt-out is remembered. */
+  if (prefs.rich === undefined) prefs.rich = true;
   applyPrefs();
 
   if (prefs.followSystemTheme) {
@@ -1141,6 +1152,9 @@ async function boot(){
   const restored = await restoreSession(saved.session);
   if (!restored) adopt(WELCOME, "Welcome.md", null, 0);
   updateStatus();
+
+  /* after the document is in place, so the editor opens with real content */
+  if (prefs.rich) { prefs.rich = false; await setRich(true, { silent: true }); }
 
   wireUI();
   api.on.menu(({ cmd, arg }) => {
@@ -1179,11 +1193,6 @@ function wireUI(){
   $("#btn-help").onclick = () => openPalette("commands");
   $("#docname").onclick = () => renameDoc();
   $("#docname").title = "Click to rename";
-
-  ["#btn-bold", "#btn-italic", "#btn-link"].forEach(sel => $(sel).addEventListener("mousedown", e => e.preventDefault()));
-  $("#btn-bold").onclick = () => withActive(ta => wrapSel(ta, "**", "**"));
-  $("#btn-italic").onclick = () => withActive(ta => wrapSel(ta, "*", "*"));
-  $("#btn-link").onclick = () => withActive(ta => linkSel(ta));
 
   $$(".side-tabs button").forEach(b => { b.onclick = () => setPane(b.dataset.pane); });
   $$(".theme-dot").forEach(d => { d.onclick = () => setTheme(d.dataset.theme); });

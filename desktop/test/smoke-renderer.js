@@ -1,7 +1,11 @@
 /* Runs inside the renderer. Returns a report object to the main process. */
 (async () => {
   const failures = [];
-  const check = (name, cond, extra) => { if (!cond) failures.push(name + (extra ? " — " + extra : "")); };
+  let ran = 0;
+  const check = (name, cond, extra) => {
+    ran++;
+    if (!cond) failures.push(name + (extra ? " — " + extra : ""));
+  };
   const $ = s => document.querySelector(s);
 
   // give boot() a moment to finish its awaits
@@ -63,9 +67,47 @@
   try { css = await window.inkwell.assets.css(); } catch (e) {}
   check("export stylesheet readable", css.length > 1000, "len=" + css.length);
 
+  /* ---- rich text mode: the default view, and its three menus ---- */
+  const R = await import("./js/rich-editor.js");
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  check("boots into rich text mode", R.isReady(), "rich editor not running");
+  check("body carries the rich mode class", document.body.classList.contains("mode-rich"));
+  check("booting does not dirty the document", state.dirty === false, "dirty=" + state.dirty);
+  check("formatting lives in the menus, not the toolbar",
+        !document.querySelector("#btn-bold") && !document.querySelector("#btn-italic") && !document.querySelector("#btn-link"));
+
+  if (R.isReady()) {
+    const tt = R.instance();
+    tt.chain().focus().setTextSelection(tt.state.doc.content.size - 1).splitBlock().run();
+    await wait(260);
+    check("floating menu shows on an empty line", R.floatingMenuVisible());
+
+    tt.chain().focus().insertContent("/tab").run();
+    await wait(260);
+    check("slash menu opens and filters", R.slashMenuVisible()
+      && document.querySelectorAll("#rich-slash .si").length === 1,
+      document.querySelectorAll("#rich-slash .si").length + " items");
+
+    const view = tt.view;
+    const consumed = view.someProp("handleKeyDown", f =>
+      f(view, new KeyboardEvent("keydown", { key: "Escape" })));
+    check("slash menu owns its keys", consumed === true);
+    await wait(160);
+
+    /* the round trip is the promise that matters: markdown in, markdown out */
+    R.setMarkdown("## Round trip\n\n- [x] done\n- [ ] todo\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n");
+    await wait(320);
+    const back = R.getMarkdown() || "";
+    check("round trip keeps headings, tasks and tables",
+      /^## Round trip$/m.test(back) && /^- \[x\] done$/m.test(back) && back.includes("| A | B |"),
+      JSON.stringify(back.slice(0, 90)));
+  }
+
   return {
     failures,
-    checks: 21 - failures.length,
+    checks: ran - failures.length,
+    ran,
     blocks: state.blocks.length,
     theme: document.documentElement.dataset.theme,
     platform: window.inkwell.platform
