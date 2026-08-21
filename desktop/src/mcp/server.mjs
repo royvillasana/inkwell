@@ -30,10 +30,19 @@ function settingsPath(){
   return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "Inkwell", "settings.json");
 }
 
-function resolveVault(){
+/* Pinned by --vault or INKWELL_VAULT: that choice is fixed for the process.
+   With neither, we follow the app, and "follow" has to mean per call — the app
+   can switch vaults at any time, and a server that resolved once at startup
+   would keep reading and writing the previous one, quietly, while the window
+   showed something else. */
+function pinnedVault(){
   const flag = process.argv.indexOf("--vault");
   if (flag > -1 && process.argv[flag + 1]) return path.resolve(process.argv[flag + 1]);
   if (process.env.INKWELL_VAULT) return path.resolve(process.env.INKWELL_VAULT);
+  return null;
+}
+
+function appVault(){
   try {
     const saved = JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
     if (saved.vault) return saved.vault;
@@ -41,10 +50,27 @@ function resolveVault(){
   return null;
 }
 
-const VAULT = resolveVault();
+const PINNED = pinnedVault();
+const resolveVault = () => PINNED || appVault();
+
+let VAULT = resolveVault();
 if (!VAULT || !fs.existsSync(VAULT)) {
   console.error("inkwell-mcp: no vault. Pass --vault <folder>, set INKWELL_VAULT, or open a vault in Inkwell first.");
   process.exit(1);
+}
+
+/* The search index belongs to one root, so re-point it whenever the app moves. */
+let indexedRoot = null;
+async function syncVault(){
+  const next = resolveVault();
+  if (!next) throw new Error("Inkwell has no vault open. Open one, or start this server with --vault.");
+  if (!fs.existsSync(next)) throw new Error("The vault at " + next + " is not there any more.");
+  VAULT = next;
+  if (VAULT !== indexedRoot) {
+    await search.setRoot(VAULT);
+    indexedRoot = VAULT;
+    console.error("inkwell-mcp: serving " + VAULT);
+  }
 }
 
 /* ---- helpers -------------------------------------------------------------- */
@@ -86,6 +112,12 @@ async function reindex(file){
 
 /* ---- server --------------------------------------------------------------- */
 const server = new McpServer({ name: "inkwell", version: "1.0.0" });
+
+/* Wrap once rather than remembering to call syncVault() in fifteen handlers —
+   the one that gets forgotten is the one that writes to the wrong vault. */
+const registerTool = server.registerTool.bind(server);
+server.registerTool = (name, meta, handler) =>
+  registerTool(name, meta, async (...args) => { await syncVault(); return handler(...args); });
 
 server.registerTool("list_notes", {
   title: "List notes",
@@ -310,9 +342,10 @@ server.registerTool("vault_info", {
   title: "About this vault",
   description: "Where the vault is and how much is in it.",
   inputSchema: {}
-}, async () => json({ vault: VAULT, ...search.stats() }));
+}, async () => json({ vault: VAULT, following: PINNED ? "pinned" : "whichever vault Inkwell has open", ...search.stats() }));
 
 /* ---- go ------------------------------------------------------------------- */
 await search.setRoot(VAULT);
+indexedRoot = VAULT;
 await server.connect(new StdioServerTransport());
-console.error("inkwell-mcp: serving " + VAULT);
+console.error("inkwell-mcp: serving " + VAULT + (PINNED ? " (pinned)" : " (following Inkwell)"));

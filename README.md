@@ -60,7 +60,7 @@ Use it when you want to hand someone an editor as a single attachment.
 
 ## Desktop build
 
-Prebuilt: **[Inkwell-2.1.5-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+Prebuilt: **[Inkwell-2.1.6-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
 (macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
 app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
 
@@ -122,9 +122,15 @@ that gives Claude Code — or any MCP client — vault-aware access to your note
 claude mcp add inkwell --scope user -- node /path/to/desktop/src/mcp/server.mjs
 ```
 
+That path is a **source checkout** with `npm install` run in `desktop/` — the
+server needs the MCP SDK from `node_modules`. The copy inside the packaged
+`.app` cannot run on its own: the SDK is a build-time dependency and is not
+shipped in the bundle.
+
 With no `--vault` argument it serves whichever vault Inkwell currently has
-open, so the agent and the window you are looking at never disagree. Pass
-`--vault <folder>` or set `INKWELL_VAULT` to point it somewhere else.
+open, and keeps doing so: it re-reads the app's choice on every call, so
+switching vaults in the window moves the agent too. Pass `--vault <folder>` or
+set `INKWELL_VAULT` to pin it somewhere instead, for the life of the process.
 
 An agent could already edit these files with ordinary filesystem tools — they
 are plain markdown. What this adds is the vault: full-text search, backlinks,

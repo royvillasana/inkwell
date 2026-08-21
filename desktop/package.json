@@ -1,7 +1,7 @@
 {
   "name": "inkwell",
   "productName": "Inkwell",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "A quiet markdown editor for the desktop",
   "main": "src/main/main.js",
   "author": "Roy Villasana",
