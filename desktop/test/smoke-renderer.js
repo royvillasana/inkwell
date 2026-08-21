@@ -118,6 +118,21 @@
       JSON.stringify(back.slice(0, 90)));
   }
 
+  /* ---- the wordmark and the traffic lights --------------------------------
+     main.js pins the lights at {x:14, y:15}; they are 12px across and 20px
+     apart, so their centres are at y=21 and the last one ends at x=66. The
+     wordmark shares that row, which only works while those numbers agree. */
+  if (document.body.classList.contains("mac")) {
+    const brandRect = document.querySelector(".brand").getBoundingClientRect();
+    const centreY = (brandRect.top + brandRect.bottom) / 2;
+    check("the wordmark sits on the traffic lights' row", Math.abs(centreY - 21) <= 1.5,
+      "centre y=" + Math.round(centreY));
+    check("the wordmark clears the traffic lights", brandRect.left >= 70,
+      "left=" + Math.round(brandRect.left));
+    check("and is not pushed off to the right", brandRect.left <= 96,
+      "left=" + Math.round(brandRect.left));
+  }
+
   /* ---- the vault bar ----------------------------------------------------- */
   const Vault = await import("./js/vault.js");
   const bar = $("#vault-bar"), ctx = $("#ctx");

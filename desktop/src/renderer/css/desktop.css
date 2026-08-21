@@ -8,7 +8,11 @@
   height:0;flex:0 0 0;-webkit-app-region:drag;background:var(--panel);
 }
 body.mac #titlebar{height:28px;flex:0 0 28px;border-bottom:1px solid var(--rule)}
-body.mac .side-head{padding-top:30px}
+/* The wordmark shares the traffic lights' row rather than sitting under it.
+   The lights are placed at {x:14, y:15} (main.js) and are 12px across, so their
+   centres are at y=21 and the last one ends near x=66: a 42px row centres the
+   text on them, and 78px of left padding clears them with room to spare. */
+body.mac .side-head{height:42px;padding:0 12px 0 78px}
 #toolbar,#tabs,.side-head{-webkit-app-region:drag}
 #toolbar button,#tabs button,.side-head button,#docname,.side-tabs{-webkit-app-region:no-drag}
 
