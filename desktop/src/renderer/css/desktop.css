@@ -221,7 +221,8 @@ body.mode-rich #richwrap{display:block}
   padding:5px 9px;border-radius:7px;max-width:280px;
   background:var(--ink);color:var(--bg);
   font-family:var(--font-ui);font-size:12px;line-height:1.35;font-weight:500;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  /* wrap rather than truncate: a clipped tooltip answers nothing */
+  white-space:normal;text-wrap:pretty;
   box-shadow:0 4px 16px rgba(0,0,0,.3);
   /* no delay — the whole point is that it answers on contact */
   transition:opacity .08s linear
