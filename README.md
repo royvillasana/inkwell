@@ -60,7 +60,7 @@ Use it when you want to hand someone an editor as a single attachment.
 
 ## Desktop build
 
-Prebuilt: **[Inkwell-2.1.1-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+Prebuilt: **[Inkwell-2.1.2-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
 (macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
 app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
 
@@ -77,7 +77,7 @@ downloads: `npm approve-scripts electron`.
 
 ### What the desktop build adds
 
-- **Rich text mode** (`⌘R`) — a full WYSIWYG surface built on
+- **Rich text mode** — the default view (`⌘R` switches back), a full WYSIWYG surface built on
   [TipTap](https://tiptap.dev) / ProseMirror, over the same markdown file.
   Markdown syntax never appears; formatting applies to the selection through a
   floating bubble menu, tables resize by dragging, and the document is written
