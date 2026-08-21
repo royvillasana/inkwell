@@ -303,6 +303,27 @@ async function test(name, fn){
     assert.ok(!/src="https?:/.test(html), "remote script reference found");
   });
 
+  await test("the landing page's try.html matches the light build", () => {
+    const root = path.join(__dirname, "..", "..");
+    const light = fs.readFileSync(path.join(root, "Inkwell.html"), "utf8");
+    const served = fs.readFileSync(path.join(root, "docs", "try.html"), "utf8");
+    assert.strictEqual(served, light,
+      "docs/try.html has drifted from Inkwell.html — copy it across after editing the light build");
+  });
+
+  await test("the status bar sheds items rather than wrapping", () => {
+    const root = path.join(__dirname, "..", "..");
+    for (const [name, file] of [
+      ["light build", path.join(root, "Inkwell.html")],
+      ["desktop", path.join(__dirname, "..", "src", "renderer", "css", "app.css")]
+    ]) {
+      const css = fs.readFileSync(file, "utf8");
+      assert.ok(/#status > \*\{white-space:nowrap/.test(css), name + ": status items can still wrap");
+      assert.ok(/@media \(max-width:760px\)\{[\s\S]{0,200}?\.s-read/.test(css), name + ": no first cut");
+      assert.ok(/@media \(max-width:560px\)\{[\s\S]{0,200}?\.s-chars/.test(css), name + ": no second cut");
+    }
+  });
+
   /* ---- the update swap ----------------------------------------------------
      This is the part that can leave someone with no app at all, so the real
      script is generated and actually run against stand-in bundles. */

@@ -262,11 +262,28 @@ body.mode-source #source{display:block}
 
 /* ---------- Status bar ---------- */
 #status{
-  height:26px;flex:0 0 26px;display:flex;align-items:center;gap:14px;
+  height:26px;flex:0 0 26px;display:flex;align-items:center;gap:14px;overflow:hidden;
   padding:0 12px;border-top:1px solid var(--rule);background:var(--panel);
   font-size:11.5px;color:var(--ink-faint);
 }
+#status > *{white-space:nowrap;flex:0 0 auto}
 #status .grow{flex:1}
+
+/* A narrow window cannot hold nine readouts. Rather than let them wrap into a
+   26px-tall bar — which stacked "2 min read" into three cramped lines — drop
+   them by usefulness, so what survives is how much you have written and whether
+   it is saved. The two widths are measured, not picked: the full bar needs
+   ~700px and what is left after the first cut ~505px, and each cut happens
+   ~60px early. The slack matters — "draft saved 10:41 PM" is the widest item
+   and it changes length with locale and time format. */
+@media (max-width:760px){
+  #status{gap:10px}
+  #status .s-read,#status #btn-help,#status #btn-wide{display:none}
+}
+@media (max-width:560px){
+  #status .s-chars,#status .s-lines,#status #btn-type{display:none}
+}
+
 #status b{font-weight:560;color:var(--ink-soft)}
 #status button{color:var(--ink-faint)}
 #status button:hover{color:var(--ink)}
@@ -458,10 +475,10 @@ body.mode-source #source{display:block}
     </div>
 
     <div id="status">
-      <span><b id="st-words">0</b> words</span>
-      <span><b id="st-chars">0</b> chars</span>
-      <span><b id="st-lines">0</b> lines</span>
-      <span><b id="st-read">0</b> min read</span>
+      <span class="s-words"><b id="st-words">0</b> words</span>
+      <span class="s-chars"><b id="st-chars">0</b> chars</span>
+      <span class="s-lines"><b id="st-lines">0</b> lines</span>
+      <span class="s-read"><b id="st-read">0</b> min read</span>
       <span class="grow"></span>
       <span id="goal" style="display:none"></span>
       <span id="st-saved">local draft</span>

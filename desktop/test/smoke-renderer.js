@@ -92,10 +92,15 @@
   {
     const tt = R.instance();
     tt.chain().focus().setTextSelection(tt.state.doc.content.size - 1).splitBlock().run();
-    /* poll rather than guess: a cold packaged start is slower than the dev one,
-       and a fixed wait made this check flaky */
+    /* Poll rather than guess: a cold packaged start is slower than the dev one.
+       Measured, the menu appears within ~20ms, so this budget is ~70x over —
+       a failure here is not slowness. It is the other precondition: the menu
+       hides on blur, so if the window lost focus (another app stealing it
+       mid-run) it will never show. Say which of the two it was. */
     for (let i = 0; i < 25 && !R.floatingMenuVisible(); i++) await wait(60);
-    check("floating menu shows on an empty line", R.floatingMenuVisible());
+    check("floating menu shows on an empty line", R.floatingMenuVisible(),
+      document.hasFocus() ? "window focused, so the menu genuinely did not appear"
+                          : "the window was not focused, which hides the menu by design");
 
     tt.chain().focus().insertContent("/tab").run();
     for (let i = 0; i < 25 && !R.slashMenuVisible(); i++) await wait(60);
@@ -116,6 +121,27 @@
     check("round trip keeps headings, tasks and tables",
       /^## Round trip$/m.test(back) && /^- \[x\] done$/m.test(back) && back.includes("| A | B |"),
       JSON.stringify(back.slice(0, 90)));
+  }
+
+  /* ---- the status bar ------------------------------------------------------
+     It is a fixed 26px tall, so anything that wraps is clipped rather than
+     given a second line. */
+  {
+    const bar = $("#status");
+    const items = Array.from(bar.children).filter(el =>
+      getComputedStyle(el).display !== "none" && !el.classList.contains("grow"));
+    /* centres, not tops: a button and a span on the same line have different
+       heights, so their tops differ by a few px while both sit on that line */
+    const mids = items.map(el => {
+      const r = el.getBoundingClientRect();
+      return (r.top + r.bottom) / 2;
+    });
+    const spread = Math.max.apply(null, mids) - Math.min.apply(null, mids);
+    check("the status bar stays on one line", spread < 4, "centres spread by " + Math.round(spread));
+    check("nothing in the status bar is clipped", bar.scrollWidth <= bar.clientWidth + 1,
+      "overflow=" + (bar.scrollWidth - bar.clientWidth));
+    check("status items cannot wrap mid-label",
+      items.every(el => getComputedStyle(el).whiteSpace === "nowrap"));
   }
 
   /* ---- the wordmark and the traffic lights --------------------------------
