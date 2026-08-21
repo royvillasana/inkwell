@@ -125,18 +125,19 @@ function renderTabs(){
   docs.forEach(d => {
     const t = document.createElement("button");
     t.className = "tab" + (d.id === curDoc ? " on" : "");
-    t.title = d.path || d.name;
+    t.dataset.tip = d.path || d.name;
     if (d.id === curDoc ? state.dirty : d.dirty) t.appendChild(Object.assign(document.createElement("span"), { className: "dot" }));
     t.appendChild(Object.assign(document.createElement("span"), { className: "nm", textContent: d.name }));
     const x = document.createElement("span");
     x.className = "cl"; x.textContent = "×";
+    x.dataset.tip = "Close tab (⌘W)";
     x.onclick = e => { e.stopPropagation(); closeDoc(d.id); };
     t.appendChild(x);
     t.onclick = () => switchDoc(d.id);
     bar.appendChild(t);
   });
   const plus = document.createElement("button");
-  plus.className = "newtab"; plus.textContent = "+"; plus.title = "New document (⌘N)";
+  plus.className = "newtab"; plus.textContent = "+"; plus.dataset.tip = "New document (⌘N)";
   plus.onclick = () => newDoc();
   bar.appendChild(plus);
 }
@@ -1094,12 +1095,55 @@ function withActive(fn){
   if (ta) { ta.focus(); fn(ta); }
 }
 
+/* ---- tooltips -------------------------------------------------------------
+   The native title attribute waits about a second before showing, which is a
+   long time to hover an unlabelled icon. These appear on contact. */
+function mountTips(){
+  const tip = document.createElement("div");
+  tip.id = "tip";
+  tip.setAttribute("role", "tooltip");
+  document.body.appendChild(tip);
+  let current = null;
+
+  const show = el => {
+    const text = el.dataset.tip;
+    if (!text) return hide();
+    current = el;
+    tip.textContent = text;
+    tip.classList.add("on");
+    const r = el.getBoundingClientRect();
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8));
+    /* below the control, unless that would run off the bottom */
+    const below = r.bottom + 8;
+    tip.style.left = Math.round(left) + "px";
+    tip.style.top = Math.round(below + h > window.innerHeight - 8 ? r.top - h - 8 : below) + "px";
+  };
+  const hide = () => { current = null; tip.classList.remove("on"); };
+
+  document.addEventListener("pointerover", e => {
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    if (el === current) return;
+    el ? show(el) : hide();
+  });
+  /* a tooltip lingering over a menu you just opened is worse than none */
+  document.addEventListener("pointerdown", hide, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") hide(); });
+  window.addEventListener("blur", hide);
+  document.addEventListener("focusin", e => {
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    if (el) show(el);
+  });
+  document.addEventListener("focusout", hide);
+}
+
 /* --------------------------------------------------------------------- boot */
 async function boot(){
   document.body.classList.toggle("mac", IS_MAC);
   mount($("#paper"), $("#scroll"));
   mountDialogs();
   mountAids();
+  mountTips();
   V.mountSearch();
   V.setOpener((p, opts) => openPath(p, opts));
   setHeadingSource(() => headings().map(h => ({ lvl: h.lvl, text: h.text })));

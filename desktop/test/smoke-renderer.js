@@ -1,6 +1,7 @@
 /* Runs inside the renderer. Returns a report object to the main process. */
 (async () => {
   const failures = [];
+  const wait = ms => new Promise(r => setTimeout(r, ms));
   let ran = 0;
   const check = (name, cond, extra) => {
     ran++;
@@ -48,8 +49,9 @@
   mod.loadText("alpha beta\n\n- one", "Smoke.md");
   mod.activate(state.blocks[0].id, 5);
   const ta = document.querySelector(".block.active .src");
-  check("block opened its source", !!ta && ta.value === "alpha beta");
-  if (ta) {
+  check("block opened its source", !!ta && ta.value === "alpha beta",
+        ta ? JSON.stringify(ta.value) : "no active textarea");
+  {
     ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
     check("Enter split the block", state.blocks.length === 3, "blocks=" + state.blocks.length);
     const t2 = document.querySelector(".block.active .src");
@@ -69,15 +71,17 @@
 
   /* ---- rich text mode: the default view, and its three menus ---- */
   const R = await import("./js/rich-editor.js");
-  const wait = ms => new Promise(r => setTimeout(r, ms));
 
+  /* the bundle is a few hundred KB; give it a moment rather than racing it */
+  for (let i = 0; i < 40 && !R.isReady(); i++) await wait(100);
   check("boots into rich text mode", R.isReady(), "rich editor not running");
   check("body carries the rich mode class", document.body.classList.contains("mode-rich"));
   check("booting does not dirty the document", state.dirty === false, "dirty=" + state.dirty);
   check("formatting lives in the menus, not the toolbar",
         !document.querySelector("#btn-bold") && !document.querySelector("#btn-italic") && !document.querySelector("#btn-link"));
 
-  if (R.isReady()) {
+  check("rich editor is available to test", R.isReady());
+  {
     const tt = R.instance();
     tt.chain().focus().setTextSelection(tt.state.doc.content.size - 1).splitBlock().run();
     await wait(260);

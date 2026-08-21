@@ -214,3 +214,17 @@ body.mode-rich #richwrap{display:block}
 #rich-slash .si .g svg{width:14px;height:14px}
 #rich-slash .si.sel{background:var(--accent-soft);color:var(--ink)}
 #rich-slash .si.sel .g{color:var(--accent)}
+
+/* ---------- Instant tooltips ---------- */
+#tip{
+  position:fixed;z-index:90;pointer-events:none;opacity:0;
+  padding:5px 9px;border-radius:7px;max-width:280px;
+  background:var(--ink);color:var(--bg);
+  font-family:var(--font-ui);font-size:12px;line-height:1.35;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  /* no delay — the whole point is that it answers on contact */
+  transition:opacity .08s linear
+}
+#tip.on{opacity:.97}
+@media (prefers-reduced-motion:reduce){ #tip{transition:none} }

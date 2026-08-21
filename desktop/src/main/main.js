@@ -12,6 +12,13 @@ const { buildMenu } = require("./menu");
 const pandoc = require("./pandoc");
 
 const isDev = process.argv.includes("--dev");
+
+/* Automated runs get their own profile. Sharing userData with the real app
+   meant a test that toggled a mode rewrote the user's saved preferences, and
+   left its scratch documents in their restored session. */
+if (process.env.INKWELL_SMOKE) {
+  app.setPath("userData", path.join(os.tmpdir(), "inkwell-smoke-" + process.pid));
+}
 const windows = new Set();
 let watcher = null;
 let watchTimer = null;
@@ -105,7 +112,15 @@ async function captureShot(win){
 /* INKWELL_SMOKE=1 boots the app, asserts the renderer came up, prints a report
    and exits. Used by the release checks; invisible in normal runs. */
 async function runSmoke(win){
-  const script = require("fs").readFileSync(process.env.INKWELL_SMOKE_FILE || path.join(__dirname, "..", "..", "test", "smoke-renderer.js"), "utf8");
+  const file = process.env.INKWELL_SMOKE_FILE || path.join(__dirname, "..", "..", "test", "smoke-renderer.js");
+  let script;
+  try { script = require("fs").readFileSync(file, "utf8"); }
+  catch (err) {
+    /* fail fast: a missing script used to leave the app hanging with no output */
+    console.log("SMOKE FAILED cannot read " + file + ": " + err.message);
+    process.exitCode = 1;
+    return app.quit();
+  }
   try {
     const report = await win.webContents.executeJavaScript(script, true);
     console.log("SMOKE " + JSON.stringify(report, null, 2));
