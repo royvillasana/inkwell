@@ -303,6 +303,93 @@ async function test(name, fn){
     assert.ok(!/src="https?:/.test(html), "remote script reference found");
   });
 
+  /* ---- the update swap ----------------------------------------------------
+     This is the part that can leave someone with no app at all, so the real
+     script is generated and actually run against stand-in bundles. */
+  console.log("\nupdate swap");
+  const swapBody = upSrc.slice(upSrc.indexOf("const q = "), upSrc.indexOf("/* The installed bundle"));
+  const swapScript = new Function(swapBody + "; return swapScript;")();
+  const { execFileSync } = require("child_process");
+
+  const stage = async () => {
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "inkwell-swap-"));
+    const appPath = path.join(dir, "Inkwell.app");
+    const staged = path.join(dir, ".staged.app");
+    await fsp.mkdir(path.join(appPath, "Contents"), { recursive: true });
+    await fsp.writeFile(path.join(appPath, "Contents", "which"), "old");
+    await fsp.mkdir(path.join(staged, "Contents"), { recursive: true });
+    await fsp.writeFile(path.join(staged, "Contents", "which"), "new");
+    return { dir, appPath, staged, log: path.join(dir, "update.log") };
+  };
+  /* a pid that has already exited, so the script's wait loop falls straight
+     through instead of the test having to keep a process alive */
+  const deadPid = (() => {
+    const p = require("child_process").spawnSync("/bin/sh", ["-c", "exit 0"]);
+    return p.pid;
+  })();
+  const runSwap = async (s, opts = {}) => {
+    const file = path.join(s.dir, "swap.sh");
+    await fsp.writeFile(file, swapScript({
+      appPath: s.appPath, staged: s.staged, backup: s.staged + ".old",
+      pid: deadPid, logFile: s.log, launcher: "/usr/bin/true"
+    }), { mode: 0o700 });
+    let code = 0;
+    try { execFileSync("/bin/sh", [file], { stdio: "ignore" }); }
+    catch (err) { code = err.status == null ? 1 : err.status; }
+    return { code, file };
+  };
+
+  await test("the swap replaces the app with the staged bundle", async () => {
+    const s = await stage();
+    const { code, file } = await runSwap(s);
+    assert.strictEqual(code, 0, "script failed");
+    assert.strictEqual(fs.readFileSync(path.join(s.appPath, "Contents", "which"), "utf8"), "new");
+    assert.ok(!fs.existsSync(s.staged), "staged bundle left behind");
+    assert.ok(!fs.existsSync(s.staged + ".old"), "backup left behind");
+    assert.ok(!fs.existsSync(file), "the helper script did not delete itself");
+    await fsp.rm(s.dir, { recursive: true, force: true });
+  });
+
+  await test("a missing staged bundle leaves the installed app untouched", async () => {
+    const s = await stage();
+    await fsp.rm(s.staged, { recursive: true, force: true });
+    const { code } = await runSwap(s);
+    assert.notStrictEqual(code, 0, "should have failed");
+    assert.ok(fs.existsSync(s.appPath), "the app was removed anyway");
+    assert.strictEqual(fs.readFileSync(path.join(s.appPath, "Contents", "which"), "utf8"), "old");
+    await fsp.rm(s.dir, { recursive: true, force: true });
+  });
+
+  await test("a failed swap puts the old app back", async () => {
+    const s = await stage();
+    /* a staged path that passes the -d check but cannot be moved into place:
+       make the destination parent read-only after the backup rename */
+    const file = path.join(s.dir, "swap.sh");
+    const script = swapScript({
+      appPath: s.appPath, staged: s.staged, backup: s.staged + ".old",
+      pid: deadPid, logFile: s.log, launcher: "/usr/bin/true"
+    }).replace("mv '" + s.staged + "' '" + s.appPath + "'", "false");
+    await fsp.writeFile(file, script, { mode: 0o700 });
+    let code = 0;
+    try { execFileSync("/bin/sh", [file], { stdio: "ignore" }); }
+    catch (err) { code = err.status == null ? 1 : err.status; }
+    assert.notStrictEqual(code, 0, "should have reported failure");
+    assert.ok(fs.existsSync(s.appPath), "the app was not restored");
+    assert.strictEqual(fs.readFileSync(path.join(s.appPath, "Contents", "which"), "utf8"), "old",
+      "restored the wrong thing");
+    await fsp.rm(s.dir, { recursive: true, force: true });
+  });
+
+  await test("paths with quotes and spaces survive the script", () => {
+    const text = swapScript({
+      appPath: "/Apps/Roy's Inkwell.app", staged: "/Apps/.staged.app",
+      backup: "/Apps/.b.app", pid: 42, logFile: "/tmp/u.log"
+    });
+    assert.ok(text.includes("'/Apps/Roy'\\''s Inkwell.app'"), "quote not escaped:\n" + text);
+    assert.ok(text.includes("kill -0 42"), "pid missing");
+    assert.ok(/open '\/Apps\/Roy/.test(text), "launcher defaults to open");
+  });
+
   await fsp.rm(root, { recursive: true, force: true });
   console.log("\n" + pass + " passed, " + fail + " failed\n");
   process.exit(fail ? 1 : 0);

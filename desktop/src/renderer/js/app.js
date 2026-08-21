@@ -1289,10 +1289,17 @@ async function runUpdate(){
   $("#up-bar").hidden = false;
   try {
     const file = await api.updates.download(pendingUpdate.asset);
-    go.textContent = "Opening…";
-    await api.updates.install(file.path);
-    $("#up-body").textContent = "Drag Inkwell to Applications to finish, then reopen it.";
-    go.textContent = "Done";
+    go.textContent = "Installing…";
+    $("#up-body").textContent = "Checking the download and replacing the app.";
+    const res = await api.updates.install(file.path);
+    if (res && res.mode === "inplace") {
+      /* main quits a moment later; the swap happens while we are gone */
+      $("#up-body").textContent = "Inkwell " + res.version + " is installed. Restarting…";
+      go.textContent = "Restarting";
+    } else {
+      $("#up-body").textContent = "Drag Inkwell to Applications to finish, then reopen it.";
+      go.textContent = "Done";
+    }
   } catch (err) {
     $("#up-body").textContent = "That did not work: " + err.message;
     go.textContent = "Open release";

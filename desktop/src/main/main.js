@@ -406,7 +406,21 @@ handle("updates:download", async asset => {
   return res;
 });
 
-handle("updates:install", file => updates.install(file));
+/* Replace ourselves if we can, and hand over the disk image if we cannot —
+   a locked-down install location or an image that fails vetting should end in
+   the old manual path, not in an error the user can do nothing with. */
+handle("updates:install", async file => {
+  try {
+    const res = await updates.installInPlace(file);
+    /* the helper is waiting on this process to exit before it swaps */
+    setTimeout(() => app.quit(), 400);
+    return res;
+  } catch (err) {
+    console.warn("in-place update unavailable:", err.message);
+    await updates.install(file);
+    return { mode: "dmg", reason: err.message };
+  }
+});
 handle("updates:page", () => { shell.openExternal(updates.RELEASES_PAGE); return true; });
 
 handle("assets:css", () =>

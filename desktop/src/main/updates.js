@@ -1,17 +1,24 @@
 "use strict";
 /* Update checking against GitHub Releases.
  *
- * Why not electron-updater: applying an update in place on macOS goes through
+ * Why not electron-updater: applying an update on macOS goes through
  * Squirrel.Mac, which refuses a bundle that is not signed with a Developer ID.
- * Our builds are ad-hoc signed (see scripts/adhoc-sign.js), so a silent
- * self-install would fail at the last step. Instead we fetch the release, hand
- * the user the DMG we downloaded, and let them drop it in place. The moment a
- * Developer ID exists this can become a real auto-update.
+ * Our builds are ad-hoc signed (see scripts/adhoc-sign.js), so it would fail at
+ * the last step. We do the same job ourselves instead — verify the download
+ * against GitHub's published checksum, check the bundle inside it really is a
+ * newer Inkwell with an intact signature, then swap it in and relaunch. See
+ * installInPlace below. Handing over the disk image is now only the fallback,
+ * for when the app cannot write to where it is installed.
+ *
+ * A Developer ID would still be worth having: it would let this happen on quit
+ * with no prompt, and would spare new users the "damaged" warning on first run.
  *
  * This is the ONLY network request Inkwell makes, it goes to api.github.com,
  * it sends no identifiers, and it can be turned off in Preferences.
  */
 const { net, app, shell } = require("electron");
+const { execFile, spawn } = require("child_process");
+const crypto = require("crypto");
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
@@ -86,7 +93,7 @@ async function check(){
       name: "Inkwell " + FAKE,
       notes: "Pretend release used by the tests.",
       page: RELEASES_PAGE,
-      asset: { name: "Inkwell-" + FAKE + "-arm64.dmg", url: "fake://asset", size: 4 }
+      asset: { name: "Inkwell-" + FAKE + "-arm64.dmg", url: "fake://asset", size: 4, digest: null }
     };
   }
   const release = await request(API, { json: true });
@@ -100,7 +107,7 @@ async function check(){
     name: release.name || ("Inkwell " + latest),
     notes: (release.body || "").slice(0, 4000),
     page: release.html_url || RELEASES_PAGE,
-    asset: asset ? { name: asset.name, url: asset.browser_download_url, size: asset.size } : null
+    asset: asset ? { name: asset.name, url: asset.browser_download_url, size: asset.size, digest: asset.digest || null } : null
   };
 }
 
@@ -130,17 +137,27 @@ function download(asset, onProgress){
       const total = Number(res.headers["content-length"] || asset.size || 0);
       let got = 0;
       const out = fs.createWriteStream(tmp);
+      /* GitHub publishes each asset's sha256, so a download can be checked
+         rather than trusted. A file that does not match is deleted, not kept. */
+      const hash = crypto.createHash("sha256");
 
       res.on("data", chunk => {
         got += chunk.length;
+        hash.update(chunk);
         out.write(chunk);
         if (onProgress && total) onProgress(Math.min(1, got / total), got, total);
       });
       res.on("end", async () => {
         out.end(async () => {
           try {
+            const sum = hash.digest("hex");
+            const want = String(asset.digest || "").replace(/^sha256:/i, "").toLowerCase();
+            if (want && want !== sum) {
+              await fsp.unlink(tmp).catch(() => {});
+              return reject(new Error("The download did not match the checksum GitHub published."));
+            }
             await fsp.rename(tmp, target);      // only a finished file gets the real name
-            resolve({ path: target, name: asset.name, size: got });
+            resolve({ path: target, name: asset.name, size: got, sha256: sum });
           } catch (err) { reject(err); }
         });
       });
@@ -149,6 +166,133 @@ function download(asset, onProgress){
     req.on("error", err => { fsp.unlink(tmp).catch(() => {}); reject(err); });
     req.end();
   });
+}
+
+/* ---- installing it ourselves ----------------------------------------------
+   Squirrel.Mac would do this, but it refuses a bundle that is not signed with a
+   Developer ID, and ours is ad-hoc. So we do the same job by hand: verify the
+   disk image, stage the new bundle beside the old one, and let a detached
+   helper swap them once we have quit.
+
+   Nothing here patches files inside the installed app. A macOS bundle's
+   signature seals every file it contains, so editing one in place is exactly
+   what produces "Inkwell is damaged and can't be opened". The whole bundle is
+   replaced, atomically, or nothing happens at all. */
+
+const run = (cmd, args, opts = {}) => new Promise((resolve, reject) => {
+  execFile(cmd, args, { maxBuffer: 1 << 22, ...opts }, (err, stdout, stderr) =>
+    err ? reject(new Error((stderr || err.message).trim())) : resolve(String(stdout)));
+});
+
+/* Single-quote a path for /bin/sh. These come from the OS rather than the
+   network, but the helper runs unattended and a stray quote would be ugly. */
+const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
+
+/* Two renames on one volume: each is atomic, and if the second fails the first
+   is undone. The worst case is the old app back where it started. */
+function swapScript({ appPath, staged, backup, pid, logFile, launcher = "open" }){
+  return [
+    "#!/bin/sh",
+    "# Written by Inkwell to finish an update. Safe to delete.",
+    "exec >>" + q(logFile) + " 2>&1",
+    'echo "--- swap started $(date)"',
+    "i=0",
+    "while kill -0 " + pid + " 2>/dev/null; do",
+    "  i=$((i+1))",
+    "  [ $i -gt 600 ] && { echo 'gave up waiting for the app to quit'; exit 1; }",
+    "  sleep 0.1",
+    "done",
+    "[ -d " + q(staged) + " ] || { echo 'staged bundle missing'; exit 1; }",
+    "rm -rf " + q(backup),
+    "mv " + q(appPath) + " " + q(backup) + " || { echo 'could not move the old app aside'; exit 1; }",
+    "if mv " + q(staged) + " " + q(appPath) + "; then",
+    "  rm -rf " + q(backup),
+    "else",
+    "  echo 'swap failed, putting the old app back'",
+    "  mv " + q(backup) + " " + q(appPath),
+    "  exit 1",
+    "fi",
+    "echo 'swapped, relaunching'",
+    /* the launcher is a seam so the tests can run the real script without
+       actually launching an app */
+    launcher + " " + q(appPath),
+    'rm -f "$0"',
+    ""
+  ].join("\n");
+}
+
+/* The installed bundle, derived from the running binary rather than assumed. */
+function bundlePath(){
+  const exe = app.getPath("exe");                     // …/Inkwell.app/Contents/MacOS/Inkwell
+  const guess = path.resolve(exe, "..", "..", "..");
+  return guess.endsWith(".app") ? guess : null;
+}
+
+async function mountedApp(dmg, mountPoint){
+  await run("/usr/bin/hdiutil", ["attach", dmg, "-nobrowse", "-readonly", "-mountpoint", mountPoint]);
+  const entries = await fsp.readdir(mountPoint);
+  const found = entries.find(e => e.endsWith(".app"));
+  if (!found) throw new Error("That disk image has no application in it.");
+  return path.join(mountPoint, found);
+}
+
+/* Refuse anything not confirmed to be the same app, newer, and intact. */
+async function vetBundle(candidate){
+  const plist = path.join(candidate, "Contents", "Info.plist");
+  const id = (await run("/usr/bin/defaults", ["read", plist, "CFBundleIdentifier"])).trim();
+  const version = (await run("/usr/bin/defaults", ["read", plist, "CFBundleShortVersionString"])).trim();
+
+  if (id !== "com.royvillasana.inkwell") throw new Error("That disk image contains " + id + ", not Inkwell.");
+  if (compareVersions(version, app.getVersion()) <= 0) {
+    throw new Error("That disk image holds " + version + ", which is not newer than " + app.getVersion() + ".");
+  }
+  /* the check that would have caught the build that shipped broken */
+  await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", candidate]);
+  return version;
+}
+
+/* Returns "inplace" when the app will restart itself, and throws when it
+   cannot — the caller then falls back to handing the user the disk image. */
+async function installInPlace(dmg){
+  if (process.platform !== "darwin") throw new Error("In-place install is macOS only.");
+  const appPath = bundlePath();
+  if (!appPath) throw new Error("Inkwell is not running from an app bundle.");
+
+  const parent = path.dirname(appPath);
+  /* staging must share the volume with the app, or the rename is not atomic */
+  await fsp.access(parent, fs.constants.W_OK)
+    .catch(() => { throw new Error("Inkwell cannot write to " + parent + ", so it cannot replace itself."); });
+
+  const mountPoint = path.join(os.tmpdir(), "inkwell-update-" + process.pid);
+  const staged = path.join(parent, ".Inkwell-update-" + process.pid + ".app");
+  let mounted = false;
+  try {
+    const candidate = await mountedApp(dmg, mountPoint);
+    mounted = true;
+    const version = await vetBundle(candidate);
+
+    await fsp.rm(staged, { recursive: true, force: true });
+    await run("/usr/bin/ditto", [candidate, staged]);
+    /* and again once copied: a truncated copy must not reach the swap */
+    await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", staged]);
+
+    await run("/usr/bin/hdiutil", ["detach", mountPoint, "-quiet"]).catch(() => {});
+    mounted = false;
+
+    const logFile = path.join(app.getPath("userData"), "update.log");
+    const script = path.join(os.tmpdir(), "inkwell-swap-" + process.pid + ".sh");
+    await fsp.writeFile(script, swapScript({
+      appPath, staged, backup: staged + ".old", pid: process.pid, logFile
+    }), { mode: 0o700 });
+
+    /* detached, so it outlives the quit it is waiting for */
+    spawn("/bin/sh", [script], { detached: true, stdio: "ignore" }).unref();
+    return { mode: "inplace", version };
+  } catch (err) {
+    if (mounted) await run("/usr/bin/hdiutil", ["detach", mountPoint, "-quiet"]).catch(() => {});
+    await fsp.rm(staged, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
 }
 
 /* Opens the downloaded disk image and shows it in Finder behind. */
@@ -161,4 +305,7 @@ async function install(file){
   return true;
 }
 
-module.exports = { check, download, install, compareVersions, pickAsset, RELEASES_PAGE };
+module.exports = {
+  check, download, install, installInPlace, swapScript, bundlePath,
+  compareVersions, pickAsset, RELEASES_PAGE
+};

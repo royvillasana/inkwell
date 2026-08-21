@@ -60,7 +60,7 @@ Use it when you want to hand someone an editor as a single attachment.
 
 ## Desktop build
 
-Prebuilt: **[Inkwell-2.1.6-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+Prebuilt: **[Inkwell-2.1.7-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
 (macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
 app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
 
@@ -106,12 +106,20 @@ downloads: `npm approve-scripts electron`.
 - **Native menus**, recent files, multiple windows, session restore, file
   associations for `.md`, and PDF export rendered by the app rather than a
   browser print dialog.
-- **Update notices.** Inkwell asks GitHub's releases API whether a newer
-  version exists, and shows a small card in the bottom left if so. Its button
-  downloads the disk image and opens it. This is the only network request the
-  app makes, it carries no identifiers, and Preferences can switch it off.
-  Applying an update in place would need a Developer ID signature, which these
-  builds do not have — see the note under Packaging.
+- **Updates that install themselves.** Inkwell asks GitHub's releases API
+  whether a newer version exists and shows a card in the bottom left if so.
+  Its button downloads the disk image, checks it against the SHA-256 GitHub
+  publishes, confirms the bundle inside really is a newer Inkwell with an
+  intact signature, replaces the installed app and relaunches. No dragging.
+  Dismissing the card leaves *Update to X* in the status bar for the rest of
+  the session. This is the only network request the app makes, it carries no
+  identifiers, and Preferences can switch it off.
+
+  Nothing is patched inside the installed bundle — a macOS signature seals
+  every file it contains, which is what makes an edited app "damaged". The
+  bundle is replaced whole, by two renames on one volume, and a failure puts
+  the old app back. If Inkwell cannot write to where it is installed, it falls
+  back to handing you the disk image.
 
 ### Letting an agent work in your vault
 
@@ -216,10 +224,15 @@ Unsigned builds warn on first launch. Add signing credentials to the `build`
 block in `package.json` before shipping to anyone else.
 
 Ad-hoc signing is what makes the app launch at all (`scripts/adhoc-sign.js`),
-but it is not enough for Squirrel.Mac to replace the app in place, so the
-updater downloads and opens the DMG rather than installing silently. With a
-Developer ID and notarisation, that last step could become a real
-auto-update.
+but it is not enough for Squirrel.Mac, which refuses to replace a bundle that
+is not signed with a Developer ID. So `installInPlace` in
+`src/main/updates.js` does that job itself: verify the download's checksum,
+vet the bundle inside the image, stage it beside the installed app, and let a
+detached helper swap the two once the app has quit.
+
+A Developer ID and notarisation would still be worth having. They would let
+the swap happen on quit with no prompt at all, and would spare anyone you
+share the app with the "damaged" warning on first launch.
 
 ### Sample content
 
