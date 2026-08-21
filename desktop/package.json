@@ -17,11 +17,14 @@
     "dist:linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
     "test:app": "INKWELL_SMOKE=1 electron .",
-    "test:all": "npm test && npm run test:app",
+    "test:all": "npm test && npm run test:mcp && npm run test:app",
     "postinstall": "node scripts/vendor.js",
-    "vendor": "node scripts/vendor.js"
+    "vendor": "node scripts/vendor.js",
+    "test:mcp": "node test/mcp.mjs",
+    "mcp": "node src/mcp/server.mjs"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@tiptap/core": "^3.30.2",
     "@tiptap/extension-highlight": "^3.30.2",
     "@tiptap/extension-image": "^3.30.2",
@@ -39,7 +42,8 @@
     "katex": "^0.18.4",
     "mermaid": "^11.17.0",
     "turndown": "^7.2.4",
-    "turndown-plugin-gfm": "^1.0.2"
+    "turndown-plugin-gfm": "^1.0.2",
+    "zod": "^4.4.3"
   },
   "build": {
     "appId": "com.royvillasana.inkwell",

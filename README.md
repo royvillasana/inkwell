@@ -110,6 +110,42 @@ downloads: `npm approve-scripts electron`.
   Applying an update in place would need a Developer ID signature, which these
   builds do not have — see the note under Packaging.
 
+### Letting an agent work in your vault
+
+`desktop/src/mcp/server.mjs` is an [MCP](https://modelcontextprotocol.io) server
+that gives Claude Code — or any MCP client — vault-aware access to your notes:
+
+```bash
+claude mcp add inkwell --scope user -- node /path/to/desktop/src/mcp/server.mjs
+```
+
+With no `--vault` argument it serves whichever vault Inkwell currently has
+open, so the agent and the window you are looking at never disagree. Pass
+`--vault <folder>` or set `INKWELL_VAULT` to point it somewhere else.
+
+An agent could already edit these files with ordinary filesystem tools — they
+are plain markdown. What this adds is the vault: full-text search, backlinks,
+tags, wiki-link resolution, outlines, and edits that work on structure
+(`append_to_note` under a heading, `replace_section`) rather than raw text.
+
+Fourteen tools: `list_notes`, `read_note`, `search_notes`, `create_note`,
+`write_note`, `append_to_note`, `replace_section`, `note_outline`,
+`rename_note`, `trash_note`, `backlinks`, `list_tags`, `notes_by_tag`,
+`unresolved_links`, `vault_info`.
+
+Three rules it will not break:
+
+- **Nothing leaves the vault.** Every path an agent supplies is resolved and
+  checked against the vault root; `../../../etc/passwd` is refused, as is an
+  absolute path elsewhere.
+- **Nothing is deleted.** `trash_note` moves a note to `.trash` inside the
+  vault.
+- **Nothing is one-way.** Every edit snapshots the previous version first, so
+  an agent's changes appear in Inkwell's version history like your own.
+
+The app picks agent edits up through the same file watcher it uses for any
+other external change, so notes refresh while you watch.
+
 ### Layout
 
 ```
