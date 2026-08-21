@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld("inkwell", {
   vault: {
     openDialog: () => call("dialog:openVault"),
     open: root => call("vault:open", root),
+    rename: (root, name) => call("vault:rename", root, name),
+    close: () => call("vault:close"),
     tree: () => call("vault:tree"),
     search: (q, opts) => call("vault:search", q, opts),
     backlinks: name => call("vault:backlinks", name),
@@ -100,6 +102,7 @@ contextBridge.exposeInMainWorld("inkwell", {
 
   system: {
     openExternal: url => call("shell:open", url),
+    copy: text => call("clipboard:write", text),
     confirm: opts => call("confirm", opts),
     prefersDark: () => call("theme:system")
   },

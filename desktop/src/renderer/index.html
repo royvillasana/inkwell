@@ -15,10 +15,19 @@
   <aside id="sidebar">
     <div class="side-head">
       <div class="brand"><span class="dot"></span> Inkwell</div>
-      <button id="btn-vault" class="ghost" title="Open a vault (folder of notes)">
-        <span id="vault-name">No vault</span>
-      </button>
     </div>
+
+    <!-- Which vault you are in, above everything else, in every pane. -->
+    <button id="vault-bar" aria-haspopup="menu" aria-expanded="false">
+      <span class="vault-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      </span>
+      <span class="vault-text">
+        <span id="vault-name">No vault</span>
+        <span id="vault-sub">Click to open a folder of notes</span>
+      </span>
+      <svg class="vault-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
 
     <div class="side-tabs">
       <button data-pane="files" class="on" title="Files">Files</button>

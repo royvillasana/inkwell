@@ -118,6 +118,69 @@
       JSON.stringify(back.slice(0, 90)));
   }
 
+  /* ---- the vault bar ----------------------------------------------------- */
+  const Vault = await import("./js/vault.js");
+  const bar = $("#vault-bar"), ctx = $("#ctx");
+  check("the sidebar leads with a vault bar", !!bar);
+  check("the vault bar sits above the panes and the tree",
+    !!bar && !!(bar.compareDocumentPosition($("#tree")) & Node.DOCUMENT_POSITION_FOLLOWING));
+  check("with no vault it invites you to open one",
+    $("#vault-name").textContent === "No vault" && /open a folder/i.test($("#vault-sub").textContent));
+
+  const fixture = globalThis.__smokeVault;
+  check("fixture vault was built", !!fixture);
+  /* a throw in here used to abort the whole run and report nothing, so the
+     block records its own failure and lets the rest of the suite finish */
+  if (fixture) try {
+    const name = fixture.split("/").pop();
+    await Vault.restoreVault(fixture);
+    check("the bar names the open vault", $("#vault-name").textContent === name,
+      JSON.stringify($("#vault-name").textContent));
+    check("the bar counts what is in it", /2 notes/.test($("#vault-sub").textContent),
+      JSON.stringify($("#vault-sub").textContent));
+    check("the tree drew the vault", document.querySelectorAll(".tree-item").length >= 2);
+
+    Vault.vaultMenu(bar);
+    check("the bar opens a menu", ctx.classList.contains("on") && ctx.classList.contains("anchored"));
+    const labels = Array.from(ctx.querySelectorAll("button")).map(b => b.textContent);
+    check("the menu carries the vault actions",
+      labels.some(l => /^Rename vault/.test(l)) && labels.some(l => /^Close vault$/.test(l))
+      && labels.some(l => /different vault/.test(l)) && labels.some(l => /^Copy path$/.test(l)),
+      JSON.stringify(labels));
+    /* long paths are trimmed from the left, so compare against that, and check
+       the trimming separately rather than letting it hide a wrong path */
+    const caption = ctx.querySelector(".ctx-head small");
+    check("the menu shows which vault it acts on",
+      !!caption && caption.textContent === Vault.shortPath(fixture),
+      caption && JSON.stringify(caption.textContent));
+    check("a trimmed path keeps its tail and marks the cut",
+      Vault.shortPath("/Users/someone/Documents/Notes/A Vault With A Long Name")
+        === "\u2026/Documents/Notes/A Vault With A Long Name",
+      JSON.stringify(Vault.shortPath("/Users/someone/Documents/Notes/A Vault With A Long Name")));
+    check("a short path is left alone", Vault.shortPath("/tmp/v") === "/tmp/v");
+    check("the open menu marks the bar", bar.classList.contains("open")
+      && bar.getAttribute("aria-expanded") === "true");
+    Vault.vaultMenu(bar);
+    check("clicking the bar again closes the menu",
+      !ctx.classList.contains("on") && !bar.classList.contains("open"));
+
+    /* rename through the real IPC, then put it back so the run repeats */
+    const renamed = await window.inkwell.vault.rename(fixture, "Smoke Renamed");
+    check("renaming moves the folder itself",
+      renamed.root.endsWith("Smoke Renamed") && renamed.from === fixture, JSON.stringify(renamed.root));
+    check("the notes come with it", renamed.tree.length === 2, "tree=" + renamed.tree.length);
+    const readBack = await window.inkwell.file.read(renamed.root + "/Alpha.md");
+    check("a note inside is readable at its new path", readBack.text.includes("# Alpha"));
+    const back = await window.inkwell.vault.rename(renamed.root, name);
+    check("renaming back restores the path", back.root === fixture);
+
+    await window.inkwell.vault.close();
+    check("closing a vault leaves the files alone",
+      (await window.inkwell.file.read(fixture + "/Alpha.md")).text.includes("# Alpha"));
+  } catch (err) {
+    check("the vault checks ran without throwing", false, err.message);
+  }
+
   return {
     failures,
     checks: ran - failures.length,

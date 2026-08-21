@@ -1368,7 +1368,18 @@ function wireUI(){
   $("#btn-new").onclick = () => newDoc();
   $("#btn-open").onclick = () => openFileDialog();
   $("#btn-save").onclick = () => saveDoc(false);
-  $("#btn-vault").onclick = () => V.openVaultDialog();
+  $("#vault-bar").onclick = () => V.vaultMenu($("#vault-bar"));
+  V.setToast(toast);
+  /* A renamed vault moves every file inside it. Repoint open tabs before the
+     next autosave fires, or it would write to the old path and recreate the
+     file in a folder that no longer exists. */
+  V.setPathRemap((from, to) => {
+    const move = p => (p && (p === from || p.startsWith(from + "/")) ? to + p.slice(from.length) : p);
+    for (const d of docs) d.path = move(d.path);
+    state.path = move(state.path);
+    renderTabs();
+    V.setActivePath(state.path);
+  });
   $("#btn-openfolder").onclick = () => V.openVaultDialog();
   $("#btn-newnote").onclick = () => V.newNote(V.vault.root);
   $("#btn-find").onclick = () => openFind(!$("#find").classList.contains("on"));
@@ -1421,7 +1432,12 @@ function wireUI(){
     else if (e.key === "Enter") { e.preventDefault(); const c = palList[palSel]; closePalette(); if (c) c.run(); }
   });
   $("#palette").addEventListener("mousedown", e => { if (e.target.id === "palette") closePalette(); });
-  window.addEventListener("mousedown", e => { if (!e.target.closest("#ctx")) V.hideCtx(); });
+  /* The vault bar is excluded so it can toggle its own menu: otherwise this
+     would close the menu on mousedown and the bar's click would reopen it. */
+  window.addEventListener("mousedown", e => {
+    if (!e.target.closest("#ctx") && !e.target.closest("#vault-bar")) V.hideCtx();
+  });
+  window.addEventListener("keydown", e => { if (e.key === "Escape") V.hideCtx(); }, true);
 
   /* in-document clicks: code copy, wiki links, tags, external links */
   $("#paper").addEventListener("click", async e => {

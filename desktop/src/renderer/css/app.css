@@ -81,6 +81,39 @@ body.no-sidebar #sidebar{margin-left:-264px}
 .brand{display:flex;align-items:center;gap:8px;font-weight:650;letter-spacing:-.01em}
 .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .brand small{color:var(--ink-faint);font-weight:400;font-size:11px}
+/* The vault bar: the sidebar's first line, so which vault you are in is never
+   a question. It is a menu button, not a label — everything you can do to a
+   vault hangs off it. */
+#vault-bar{
+  display:flex;align-items:center;gap:9px;
+  width:calc(100% - 20px);margin:0 10px 8px;padding:8px 9px;
+  border:1px solid var(--rule);border-radius:9px;background:var(--page);
+  text-align:left;transition:border-color var(--speed),background var(--speed);
+  -webkit-app-region:no-drag;
+}
+#vault-bar:hover{border-color:var(--accent)}
+#vault-bar.open{border-color:var(--accent);background:var(--accent-soft)}
+.vault-mark{
+  flex:0 0 auto;display:grid;place-items:center;width:26px;height:26px;
+  border-radius:7px;background:var(--accent-soft);color:var(--accent)
+}
+.vault-mark svg{width:15px;height:15px}
+.vault-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+#vault-name,#vault-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+#vault-name{font-size:13px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+#vault-sub{font-size:11px;color:var(--ink-faint)}
+.vault-chev{flex:0 0 auto;width:13px;height:13px;opacity:.45;transition:transform var(--speed)}
+#vault-bar.open .vault-chev{transform:rotate(180deg)}
+/* the menu lines the bar up rather than following the pointer */
+#ctx.anchored{min-width:210px}
+.ctx-head{
+  display:flex;flex-direction:column;gap:2px;padding:7px 10px 8px;
+  font-size:12.5px;font-weight:600;color:var(--ink)
+}
+.ctx-head small{
+  font-weight:400;font-size:10.5px;color:var(--ink-faint);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
 .side-tabs{display:flex;gap:2px;padding:2px;margin:4px 10px 8px;background:var(--panel-2);border-radius:7px}
 .side-tabs button{
   flex:1;padding:5px 8px;border-radius:5px;font-size:12px;color:var(--ink-soft);

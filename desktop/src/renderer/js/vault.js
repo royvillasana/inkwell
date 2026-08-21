@@ -12,6 +12,11 @@ let openFile = () => {};
 let activePath = null;
 
 export function setOpener(fn){ openFile = fn; }
+/* Renaming a vault moves every file in it, so the app repoints its open tabs. */
+let remapPaths = () => {};
+export function setPathRemap(fn){ remapPaths = fn; }
+let toast = () => {};
+export function setToast(fn){ toast = fn; }
 export function setActivePath(p){
   activePath = p;
   $$(".tree-item").forEach(el => el.classList.toggle("on", el.dataset.path === p));
@@ -51,12 +56,38 @@ function applyVault(res, keepScroll){
   drawVaultName();
 }
 
+/* Paths are long and the interesting end is the right-hand one. Trim whole
+   folders off the front rather than leaning on CSS: direction:rtl truncates
+   from the correct side but reorders the leading slash, so "/Users/…" renders
+   as "Users/…". */
+export function shortPath(p, max = 46){
+  if (!p || p.length <= max) return p || "";
+  const parts = p.split("/").filter(Boolean);
+  let out = parts.pop() || "";
+  while (parts.length && out.length + parts[parts.length - 1].length + 1 <= max - 2) {
+    out = parts.pop() + "/" + out;
+  }
+  return "\u2026/" + out;
+}
+
+export const vaultName = () => (vault.root ? vault.root.split(/[\\/]/).filter(Boolean).pop() : null);
+
 function drawVaultName(){
-  const el = $("#vault-name");
+  const el = $("#vault-name"), sub = $("#vault-sub"), bar = $("#vault-bar");
   if (!el) return;
-  if (!vault.root) { el.textContent = "No vault"; el.title = ""; return; }
-  el.textContent = vault.root.split(/[\\/]/).filter(Boolean).pop();
-  el.title = vault.root + (vault.stats ? "  ·  " + vault.stats.files + " notes, " + vault.stats.words.toLocaleString() + " words" : "");
+  if (!vault.root) {
+    el.textContent = "No vault";
+    if (sub) sub.textContent = "Click to open a folder of notes";
+    if (bar) bar.title = "Open a vault";
+    return;
+  }
+  el.textContent = vaultName();
+  if (sub) {
+    sub.textContent = vault.stats
+      ? vault.stats.files + (vault.stats.files === 1 ? " note" : " notes") + "  \u00b7  " + vault.stats.words.toLocaleString() + " words"
+      : shortPath(vault.root);
+  }
+  if (bar) bar.title = vault.root;
 }
 
 export function drawTree(){
@@ -105,10 +136,112 @@ function nodeList(nodes, depth){
   return frag;
 }
 
+/* ---- menus --------------------------------------------------------------- */
+/* One menu element serves the tree rows and the vault bar. An item is "-" for a
+   rule, {head, sub} for a caption, or {label, run, danger}. */
+function buildMenu(items){
+  const menu = $("#ctx");
+  menu.textContent = "";
+  menu.className = "";
+  for (const it of items) {
+    if (!it) continue;
+    if (it === "-") { menu.appendChild(document.createElement("hr")); continue; }
+    if (it.head != null) {
+      const h = document.createElement("div");
+      h.className = "ctx-head";
+      h.appendChild(document.createTextNode(it.head));
+      if (it.sub) {
+        const small = document.createElement("small");
+        small.textContent = it.sub;
+        h.appendChild(small);
+      }
+      menu.appendChild(h);
+      continue;
+    }
+    const b = document.createElement("button");
+    b.textContent = it.label;
+    if (it.danger) b.className = "danger";
+    b.onclick = () => { hideCtx(); it.run(); };
+    menu.appendChild(b);
+  }
+  return menu;
+}
+
+/* Show it, then measure: the menu has no size until it is displayed, and an
+   unmeasured one hangs off the bottom of a short window. */
+function showMenuAt(menu, x, y){
+  menu.classList.add("on");
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(6, Math.min(x, window.innerWidth - r.width - 6)) + "px";
+  menu.style.top = Math.max(6, Math.min(y, window.innerHeight - r.height - 6)) + "px";
+}
+
+/* Everything you can do to a vault, hanging off the bar that names it. */
+export function vaultMenu(anchor){
+  if (!vault.root) return openVaultDialog();
+  const open = $("#ctx");
+  if (open.classList.contains("on") && open.classList.contains("anchored")) return hideCtx();
+  const bar = anchor || $("#vault-bar");
+  const finder = api.platform === "darwin" ? "Finder" : "file manager";
+  const menu = buildMenu([
+    { head: vaultName(), sub: shortPath(vault.root) },
+    "-",
+    { label: "New note in this vault\u2026", run: () => newNote(vault.root) },
+    { label: "Reveal in " + finder, run: () => api.file.reveal(vault.root) },
+    { label: "Copy path", run: copyVaultPath },
+    "-",
+    { label: "Rename vault\u2026", run: renameVault },
+    { label: "Open a different vault\u2026", run: openVaultDialog },
+    { label: "Close vault", run: closeVault }
+  ]);
+  menu.classList.add("anchored");
+  const r = bar.getBoundingClientRect();
+  menu.style.minWidth = r.width + "px";
+  showMenuAt(menu, r.left, r.bottom + 6);
+  bar.classList.add("open");
+  bar.setAttribute("aria-expanded", "true");
+}
+
+async function copyVaultPath(){
+  try { await api.system.copy(vault.root); toast("Vault path copied"); }
+  catch (err) { say(err.message, "Could not copy the path"); }
+}
+
+async function renameVault(){
+  const current = vaultName();
+  const next = await askText(
+    "This renames the vault folder on disk. The notes inside it are untouched.",
+    current, { title: "Rename vault", label: "Folder name", ok: "Rename" }
+  );
+  if (!next || next === current) return;
+  try {
+    const res = await api.vault.rename(vault.root, next);
+    /* every open tab inside the vault now lives at a new path */
+    if (res.from && res.root !== res.from) remapPaths(res.from, res.root);
+    applyVault(res, true);
+    toast("Vault renamed to " + vaultName());
+  } catch (err) { say(err.message, "Could not rename the vault"); }
+}
+
+async function closeVault(){
+  const name = vaultName();
+  const yes = await dialog({
+    title: "Close this vault?",
+    message: "Inkwell will stop showing \u201c" + name + "\u201d in the sidebar. Nothing is deleted, and any tabs you have open stay open.",
+    buttons: [{ label: "Cancel", value: false }, { label: "Close vault", value: true }]
+  });
+  if (!yes) return;
+  try { await api.vault.close(); } catch (err) { /* forgetting it locally is enough */ }
+  vault.root = null; vault.tree = []; vault.stats = null; vault.collapsed.clear();
+  drawTree();
+  drawVaultName();
+}
+
 /* ---- context menu -------------------------------------------------------- */
 function contextMenu(e, node){
   const menu = $("#ctx");
   menu.textContent = "";
+  menu.className = "";
   const add = (label, fn, danger) => {
     const b = document.createElement("button");
     b.textContent = label;
@@ -127,11 +260,15 @@ function contextMenu(e, node){
   add("Reveal in " + (api.platform === "darwin" ? "Finder" : "file manager"), () => api.file.reveal(node.path));
   if (node.kind === "file") add("Move to Trash", () => trashNode(node), true);
 
-  menu.style.left = Math.min(e.clientX, window.innerWidth - 210) + "px";
-  menu.style.top = Math.min(e.clientY, window.innerHeight - 200) + "px";
-  menu.classList.add("on");
+  menu.style.minWidth = "";
+  showMenuAt(menu, e.clientX, e.clientY);
 }
-export function hideCtx(){ const m = $("#ctx"); if (m) m.classList.remove("on"); }
+export function hideCtx(){
+  const m = $("#ctx");
+  if (m) { m.classList.remove("on", "anchored"); m.style.minWidth = ""; }
+  const bar = $("#vault-bar");
+  if (bar) { bar.classList.remove("open"); bar.setAttribute("aria-expanded", "false"); }
+}
 
 export async function newNote(dir){
   const name = await askText("What should the note be called?", "Untitled", { title: "New note", label: "Name", ok: "Create" });

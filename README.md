@@ -94,6 +94,9 @@ downloads: `npm approve-scripts electron`.
 - **Wiki links that resolve**, with a backlinks panel and an offer to create a
   note that does not exist yet.
 - **Quick open** (`⌘⇧K`) with fuzzy name matching over the whole vault.
+- **A vault bar** at the top of the sidebar naming the vault you are in and how
+  much is in it. Click it to make a note, reveal the folder, copy its path,
+  rename the vault, switch to another, or close it.
 - **Autosave** to disk, **file watching** with reload, and a conflict prompt if
   a file changes underneath unsaved edits.
 - **Images** are written into an `assets/` folder next to the note and linked

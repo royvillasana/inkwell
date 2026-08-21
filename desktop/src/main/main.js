@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, Menu, clipboard } = require("electron");
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
@@ -135,8 +135,22 @@ async function runSmoke(win){
     process.exitCode = 1;
     return app.quit();
   }
+  /* A throwaway vault for the smoke run: the renderer has no way to name a real
+     directory, and the packaged app does not ship example-vault. */
+  let prelude = "";
   try {
-    const report = await win.webContents.executeJavaScript(script, true);
+    const fsn = require("fs");
+    const dir = path.join(os.tmpdir(), "inkwell-smoke-vault-" + process.pid);
+    fsn.rmSync(dir, { recursive: true, force: true });
+    fsn.mkdirSync(path.join(dir, "notes"), { recursive: true });
+    fsn.writeFileSync(path.join(dir, "Alpha.md"), "# Alpha\n\nPoints at [[Beta]].\n");
+    fsn.writeFileSync(path.join(dir, "notes", "Beta.md"), "# Beta\n\n#fixture\n");
+    prelude = "globalThis.__smokeVault = " + JSON.stringify(dir) + ";\n";
+  } catch (err) {
+    console.log("smoke: could not build the fixture vault: " + err.message);
+  }
+  try {
+    const report = await win.webContents.executeJavaScript(prelude + script, true);
     console.log("SMOKE " + JSON.stringify(report, null, 2));
     process.exitCode = report && report.failures && report.failures.length ? 1 : 0;
   } catch (err) {
@@ -214,6 +228,38 @@ handle("vault:open", async root => {
   watchVault(root);
   return { root, tree: await files.listTree(root), stats: search.stats() };
 });
+/* Renaming a vault renames the folder itself, so every open document inside it
+   moves with it. We hand the renderer both the old and the new root so it can
+   repoint its tabs — otherwise the next autosave would write to a path that no
+   longer exists, and quietly recreate the file at the old location. */
+handle("vault:rename", async (root, nextName) => {
+  if (!root) throw new Error("No vault is open.");
+  const clean = String(nextName || "").trim().replace(/[/\\]/g, "").replace(/^\.+/, "");
+  if (!clean) throw new Error("A vault needs a name.");
+  const target = path.join(path.dirname(root), clean);
+  if (path.resolve(target) === path.resolve(root)) {
+    return { root, from: root, tree: await files.listTree(root), stats: search.stats() };
+  }
+  const taken = await fsp.access(target).then(() => true, () => false);
+  if (taken) throw new Error("Something called \u201c" + clean + "\u201d is already there.");
+  await fsp.rename(root, target);
+  store.save({ vault: target });
+  await search.setRoot(target);
+  watchVault(target);
+  return { root: target, from: root, tree: await files.listTree(target), stats: search.stats() };
+});
+
+/* Closing a vault only forgets it. Nothing on disk is touched, and open
+   documents stay open — they are just no longer part of a browsable folder. */
+handle("vault:close", async () => {
+  store.save({ vault: null });
+  await search.setRoot(null);
+  watchVault(null);
+  return true;
+});
+
+handle("clipboard:write", async text => { clipboard.writeText(String(text == null ? "" : text)); return true; });
+
 handle("vault:tree", async () => {
   const root = store.get().vault;
   return root ? { root, tree: await files.listTree(root), stats: search.stats() } : null;
