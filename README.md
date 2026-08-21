@@ -82,9 +82,11 @@ downloads: `npm approve-scripts electron`.
   Markdown syntax never appears; formatting applies to the selection through a
   floating bubble menu, tables resize by dragging, and the document is written
   back out as plain markdown when you leave. Two menus follow the caret: a
-  bubble menu over a selection, and a floating insert menu on an empty line —
-  headings, lists, quotes, code, tables, maths, diagrams, images and rules.
-  The block editor and rich mode are two views of one file — switch freely.
+  bubble menu over a selection, and a floating insert menu on an empty line.
+  Typing `/` opens the same vocabulary as a filterable list, driven from the
+  keyboard — headings, lists, quotes, code, tables, maths, diagrams, images,
+  rules and the date. The block editor and rich mode are two views of one file
+  — switch freely.
 - **Vaults.** Open a folder and get a real tree with nested directories, plus
   create, rename, reveal and move-to-trash from the context menu.
 - **Search across every note**, with case, whole-word and regex switches, line

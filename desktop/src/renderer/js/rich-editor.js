@@ -19,6 +19,8 @@ let host = null;
 let onChange = null;
 let bubble = null;
 let floater = null;
+let slash = null;
+let slashState = null;   // { from, query, items, sel }
 
 export const isReady = () => !!editor;
 /* the underlying TipTap instance, for callers that need ProseMirror directly */
@@ -43,13 +45,16 @@ export async function open(container, markdown, opts = {}){
   container.appendChild(holder);
   buildBubble(container);
   buildFloater(container);
+  buildSlash(container);
 
   editor = new lib.Editor({
     element: holder,
     content: mdToHTML(markdown),
     autofocus: opts.autofocus !== false ? "start" : false,
     editorProps: {
-      attributes: { class: "rich-surface", spellcheck: String(opts.spellcheck !== false) }
+      attributes: { class: "rich-surface", spellcheck: String(opts.spellcheck !== false) },
+      /* the slash menu has to win these keys before ProseMirror moves the caret */
+      handleKeyDown: (view, event) => handleSlashKey(event)
     },
     extensions: [
       lib.StarterKit.configure({
@@ -65,15 +70,15 @@ export async function open(container, markdown, opts = {}){
       lib.TaskList,
       lib.TaskItem.configure({ nested: true }),
       lib.Placeholder.configure({
-        placeholder: "Write something, or pick a block below",
+        placeholder: 'Type "/" for blocks, or just write',
         showOnlyCurrent: true,
         includeChildren: false
       })
     ],
-    onUpdate: () => { if (onChange) onChange(); placeFloater(); },
-    onSelectionUpdate: () => { placeBubble(); placeFloater(); },
+    onUpdate: () => { if (onChange) onChange(); watchSlash(); placeFloater(); },
+    onSelectionUpdate: () => { placeBubble(); watchSlash(); placeFloater(); },
     onFocus: () => placeFloater(),
-    onBlur: () => { hideBubble(); hideFloater(); }
+    onBlur: () => { hideBubble(); hideFloater(); closeSlash(); }
   });
 
   /* links open in the real browser rather than navigating the app */
@@ -91,6 +96,7 @@ export async function open(container, markdown, opts = {}){
 export function close(){
   hideBubble();
   hideFloater();
+  closeSlash();
   if (editor) { editor.destroy(); editor = null; }
 }
 
@@ -395,7 +401,7 @@ function placeFloater(){
     && node.content.size === 0
     && node.type.name !== "codeBlock";
 
-  if (!onEmptyBlock || !editor.isFocused) return hideFloater();
+  if (!onEmptyBlock || !editor.isFocused || slashOpen()) return hideFloater();
 
   const at = editor.view.coordsAtPos($from.pos);
   floater.classList.add("on");
@@ -407,6 +413,127 @@ function placeFloater(){
 function hideFloater(){ if (floater) floater.classList.remove("on"); }
 
 export const floatingMenuVisible = () => !!(floater && floater.classList.contains("on"));
+
+/* ---- slash menu ----------------------------------------------------------
+   Type "/" and the blocks come to you. Same vocabulary as the floating menu,
+   but filterable and reachable without leaving the keyboard.                */
+const SLASH_ITEMS = [
+  { icon: "h1",      label: "Heading 1",     keys: "h1 title",        apply: c => c.toggleHeading({ level: 1 }).run() },
+  { icon: "h2",      label: "Heading 2",     keys: "h2 subtitle",     apply: c => c.toggleHeading({ level: 2 }).run() },
+  { icon: "h2",      label: "Heading 3",     keys: "h3",              apply: c => c.toggleHeading({ level: 3 }).run() },
+  { icon: "bullet",  label: "Bullet list",   keys: "ul unordered",    apply: c => c.toggleBulletList().run() },
+  { icon: "bullet",  label: "Numbered list", keys: "ol ordered",      apply: c => c.toggleOrderedList().run() },
+  { icon: "task",    label: "Task list",     keys: "todo checkbox",   apply: c => c.toggleTaskList().run() },
+  { icon: "quote",   label: "Quote",         keys: "blockquote",      apply: c => c.toggleBlockquote().run() },
+  { icon: "code",    label: "Code block",    keys: "pre fence",       apply: c => c.toggleCodeBlock().run() },
+  { icon: "table",   label: "Table",         keys: "grid",            apply: c => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+  { icon: "math",    label: "Maths block",   keys: "latex equation formula", apply: c => fenced(c, "math", "E = mc^2") },
+  { icon: "diagram", label: "Diagram",       keys: "mermaid flowchart graph", apply: c => fenced(c, "mermaid", "graph TD\n  A[Start] --> B[End]") },
+  { icon: "rule",    label: "Divider",       keys: "hr line separator", apply: c => c.setHorizontalRule().run() },
+  { icon: "image",   label: "Image",         keys: "picture photo",   apply: c => { c.run(); askImage(); } },
+  { icon: "date",    label: "Today's date",  keys: "now time",        apply: c => c.insertContent(new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })).run() }
+];
+ICON.date = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>';
+
+const slashOpen = () => !!slashState;
+
+function buildSlash(container){
+  if (slash && slash.isConnected) return;
+  slash = document.createElement("div");
+  slash.id = "rich-slash";
+  (container.closest("#main") || document.body).appendChild(slash);
+}
+
+function fenced(chain, lang, text){
+  return chain.insertContent({
+    type: "codeBlock",
+    attrs: { language: lang },
+    content: [{ type: "text", text }]
+  }).run();
+}
+
+/* Looks behind the caret for "/query" at a word boundary. */
+function watchSlash(){
+  if (!editor) return;
+  const { state } = editor;
+  const { empty, $from } = state.selection;
+  if (!empty || $from.parent.type.name === "codeBlock") return closeSlash();
+
+  const start = $from.start();
+  const before = state.doc.textBetween(start, $from.pos, "\n", "\n");
+  const m = before.match(/(?:^|\s)\/([\w+-]*)$/);
+  if (!m) return closeSlash();
+
+  const query = m[1];
+  const from = $from.pos - query.length - 1;      // the "/" itself
+  const items = SLASH_ITEMS.filter(it =>
+    !query || (it.label + " " + it.keys).toLowerCase().includes(query.toLowerCase()));
+
+  if (!items.length) return closeSlash();
+  const keepSel = slashState && slashState.query === query ? slashState.sel : 0;
+  slashState = { from, query, items, sel: Math.min(keepSel, items.length - 1) };
+  drawSlash();
+}
+
+function drawSlash(){
+  if (!slashState || !slash) return;
+  slash.textContent = "";
+  slashState.items.forEach((it, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "si" + (i === slashState.sel ? " sel" : "");
+    b.innerHTML = '<span class="g">' + svg(it.icon) + "</span>";
+    b.appendChild(Object.assign(document.createElement("span"), { textContent: it.label }));
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => pickSlash(i);
+    b.onmouseenter = () => { slashState.sel = i; markSlash(); };
+    slash.appendChild(b);
+  });
+  slash.classList.add("on");
+
+  const at = editor.view.coordsAtPos(slashState.from);
+  const w = slash.offsetWidth || 250;
+  const h = slash.offsetHeight || 260;
+  slash.style.left = Math.max(12, Math.min(at.left, window.innerWidth - w - 16)) + "px";
+  /* flip above the caret when there is no room below */
+  const below = at.bottom + 8;
+  slash.style.top = (below + h > window.innerHeight - 12 ? Math.max(12, at.top - h - 8) : below) + "px";
+}
+
+function markSlash(){
+  if (!slash) return;
+  Array.from(slash.children).forEach((el, i) => el.classList.toggle("sel", i === slashState.sel));
+  const el = slash.children[slashState.sel];
+  if (el) el.scrollIntoView({ block: "nearest" });
+}
+
+export function closeSlash(){
+  slashState = null;
+  if (slash) slash.classList.remove("on");
+}
+
+function pickSlash(i){
+  if (!slashState || !editor) return;
+  const it = slashState.items[i];
+  const from = slashState.from;
+  const to = editor.state.selection.from;
+  closeSlash();
+  if (!it) return;
+  it.apply(editor.chain().focus().deleteRange({ from, to }));
+}
+
+/* Returns true when the menu consumed the key. */
+function handleSlashKey(event){
+  if (!slashState) return false;
+  const k = event.key;
+  if (k === "Escape") { closeSlash(); return true; }
+  if (k === "ArrowDown") { slashState.sel = (slashState.sel + 1) % slashState.items.length; markSlash(); return true; }
+  if (k === "ArrowUp") { slashState.sel = (slashState.sel - 1 + slashState.items.length) % slashState.items.length; markSlash(); return true; }
+  if (k === "Enter" || k === "Tab") { pickSlash(slashState.sel); return true; }
+  return false;
+}
+
+export const slashMenuVisible = () => !!(slash && slash.classList.contains("on"));
 
 /* ---- commands the app's menus drive ------------------------------------- */
 export function command(name, arg){

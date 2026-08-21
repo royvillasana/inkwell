@@ -196,3 +196,21 @@ body.mode-rich #richwrap{display:block}
   content:attr(data-placeholder);float:left;height:0;pointer-events:none;
   color:var(--ink-faint);opacity:.75
 }
+
+/* ---------- Slash menu (rich text mode) ---------- */
+#rich-slash{
+  position:fixed;z-index:62;display:none;flex-direction:column;gap:1px;
+  width:238px;max-height:300px;overflow-y:auto;padding:5px;
+  background:var(--panel);border:1px solid var(--rule);border-radius:11px;
+  box-shadow:var(--shadow);font-family:var(--font-ui)
+}
+#rich-slash.on{display:flex}
+#rich-slash .si{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:7px 9px;border-radius:7px;font-size:13px;color:var(--ink-soft)
+}
+#rich-slash .si .g{display:grid;place-items:center;width:24px;height:24px;flex:0 0 auto;
+  border-radius:6px;background:var(--panel-2);color:var(--ink-faint)}
+#rich-slash .si .g svg{width:14px;height:14px}
+#rich-slash .si.sel{background:var(--accent-soft);color:var(--ink)}
+#rich-slash .si.sel .g{color:var(--accent)}
