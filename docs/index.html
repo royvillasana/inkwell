@@ -82,10 +82,9 @@ nav .get{
   font-weight:600;transition:.15s
 }
 nav .get:hover{background:#000}
-@media (max-width:720px){nav .links a.opt{display:none}}
-@media (max-width:460px){
-  /* with the links gone the wordmark and the button crowd each other, so let
-     the pill span the width and push them to opposite ends */
+@media (max-width:720px){
+  /* On a phone the pill carries one job: Download. "Try it" competed with it
+     for the same tap and the two together crowded the wordmark. */
   nav .links{display:none}
   nav{width:calc(100% - 32px);padding-right:6px}
   nav .get{margin-left:auto}
@@ -153,6 +152,23 @@ nav .get:hover{background:#000}
 .appwin-body{position:relative;aspect-ratio:2360/1640;background:var(--n-bg)}
 .appwin-body > iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
 .appwin-shot{width:100%;height:auto;display:block}
+
+/* The window frame follows the theme of the editor inside it. Switch to Paper
+   in the embed and a dark title bar around it looks like a rendering bug, so
+   the chrome is repainted from the same palettes the editor uses. */
+.appwin[data-app-theme]{transition:background .25s,border-color .25s}
+.appwin[data-app-theme] .appwin-bar{transition:background .25s,border-color .25s}
+.appwin[data-app-theme="paper"],
+.appwin[data-app-theme="sepia"]{border-color:rgba(0,0,0,.14)}
+.appwin[data-app-theme="paper"] .appwin-bar{background:var(--p-panel);border-bottom-color:var(--p-rule)}
+.appwin[data-app-theme="paper"] .appwin-title{color:var(--p-faint)}
+.appwin[data-app-theme="paper"] .appwin-body{background:var(--p-bg)}
+.appwin[data-app-theme="sepia"] .appwin-bar{background:#e4d7bd;border-bottom-color:#d6c6a8}
+.appwin[data-app-theme="sepia"] .appwin-title{color:#8a7a5e}
+.appwin[data-app-theme="sepia"] .appwin-body{background:#e9dcc6}
+.appwin[data-app-theme="slate"] .appwin-bar{background:#232839;border-bottom-color:#2f3547}
+.appwin[data-app-theme="slate"] .appwin-title{color:#8891a8}
+.appwin[data-app-theme="slate"] .appwin-body{background:#1d2230}
 
 /* Until you ask for it, the embed is inert — so scrolling past the hero never
    gets captured by an editor you did not mean to click into. */
@@ -310,13 +326,17 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 
 @media (max-width:640px){
   .hero{padding-top:132px}
-  /* the shot shrank to an illegible smudge at this width; let it bleed off the
-     right edge instead, so the part you can see is readable */
-  .stage{padding-inline:0;overflow:clip}
-  .appwin{
-    width:190%;max-width:none;margin-left:var(--pad);
-    border-radius:12px 0 0 0;border-right:0
-  }
+  /* The desktop layout used to be blown up to 190% and allowed to bleed off the
+     right edge, so a phone showed a cropped view of a window it would never
+     have. The editor has its own layout under 820px, so it now runs at the
+     phone's real width and shows what Inkwell actually looks like there —
+     whole, not a slice. */
+  .stage{padding-inline:var(--pad);overflow:visible}
+  .appwin{width:100%;max-width:none;margin:0;border-radius:12px}
+  .appwin-body{aspect-ratio:3/4}
+  /* the fallback still holds a desktop screenshot, so show its top-left corner
+     rather than shrinking the whole thing into a portrait box */
+  .appwin-shot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:left top}
   .gate{grid-template-columns:1fr}
   .hero-cta .btn{width:100%}
 }
@@ -606,13 +626,30 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
   var veil = document.getElementById("demo-veil");
   if (!win || !body || !veil) return;
 
-  var WIDE = 860;
   var loaded = false;
+  /* the editor's own breakpoint: below this it lays itself out for a phone */
+  var EDITOR_NARROW = 820;
+
+  /* Repaint the window frame to match whatever theme the editor is showing.
+     Same origin, so we can watch it directly rather than guess. */
+  function followTheme(doc) {
+    if (!doc || !doc.documentElement) return;
+    var apply = function () {
+      var theme = doc.documentElement.getAttribute("data-theme") || "night";
+      win.setAttribute("data-app-theme", theme);
+    };
+    apply();
+    if (!window.MutationObserver) return;
+    new MutationObserver(apply).observe(doc.documentElement, {
+      attributes: true, attributeFilter: ["data-theme"]
+    });
+  }
 
   function mount() {
-    if (loaded || window.innerWidth < WIDE) return;
+    if (loaded) return;
     if (window.matchMedia("(prefers-reduced-data: reduce)").matches) return;
     loaded = true;
+    var narrow = window.innerWidth < EDITOR_NARROW;
     var frame = document.createElement("iframe");
     frame.src = "try.html#theme=night";   /* match the page it sits in */
     frame.title = "Inkwell running live";
@@ -621,6 +658,12 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
       var shot = body.querySelector(".appwin-shot");
       if (shot) shot.style.visibility = "hidden";
       veil.hidden = false;
+      var doc = null;
+      try { doc = frame.contentDocument; } catch (e) { doc = null; }
+      /* On a phone the editor's sidebar is an overlay covering the writing
+         area, so start it closed — the toolbar button still opens it. */
+      if (doc && narrow && doc.body) doc.body.classList.add("no-sidebar");
+      followTheme(doc);
     });
     body.appendChild(frame);
   }
