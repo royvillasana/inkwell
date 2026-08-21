@@ -60,7 +60,7 @@ Use it when you want to hand someone an editor as a single attachment.
 
 ## Desktop build
 
-Prebuilt: **[Inkwell-2.1.4-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+Prebuilt: **[Inkwell-2.1.5-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
 (macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
 app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
 

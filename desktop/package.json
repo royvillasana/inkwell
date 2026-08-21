@@ -1,7 +1,7 @@
 {
   "name": "inkwell",
   "productName": "Inkwell",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "A quiet markdown editor for the desktop",
   "main": "src/main/main.js",
   "author": "Roy Villasana",
@@ -17,7 +17,8 @@
     "dist:linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
     "test:app": "INKWELL_SMOKE=1 electron .",
-    "test:all": "npm test && npm run test:mcp && npm run test:app",
+    "test:updates": "INKWELL_SMOKE=1 INKWELL_FAKE_UPDATE=9.9.9 electron .",
+    "test:all": "npm test && npm run test:mcp && npm run test:app && npm run test:updates",
     "postinstall": "node scripts/vendor.js",
     "vendor": "node scripts/vendor.js",
     "test:mcp": "node test/mcp.mjs",

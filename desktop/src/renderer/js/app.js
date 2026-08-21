@@ -1233,6 +1233,7 @@ let updateBusy = false;
 
 function showUpdate(info){
   pendingUpdate = info;
+  $("#st-update").hidden = true;
   $("#up-title").textContent = "Inkwell " + info.latest + " is out";
   $("#up-body").textContent = "You are on " + info.current +
     (info.asset ? ". Download it and Inkwell will open the installer for you." : ". Open the release page to get it.");
@@ -1242,17 +1243,39 @@ function showUpdate(info){
   $("#up-fill").style.width = "0";
   $("#updater").hidden = false;
 }
-const hideUpdate = () => { $("#updater").hidden = true; };
+/* Dismissing the card should mean "not now", not "never tell me again", so a
+   pending update leaves a marker in the status bar that brings it back. */
+const hideUpdate = () => {
+  $("#updater").hidden = true;
+  if (pendingUpdate) {
+    const chip = $("#st-update");
+    chip.textContent = "Update to " + pendingUpdate.latest;
+    chip.hidden = false;
+  }
+};
 
+let lastUpdateCheck = 0;
 async function checkUpdates(loud){
   if (!prefs.checkUpdates && !loud) return;
+  lastUpdateCheck = Date.now();
   try {
     const info = await api.updates.check();
     if (info.newer) showUpdate(info);
     else if (loud) say("You are on " + info.current + ", the newest release.", "Up to date");
   } catch (err) {
+    /* offline at launch is normal; the focus check below picks it up later */
     if (loud) say(err.message, "Could not check for updates");
   }
+}
+
+/* An app that is never quit would otherwise only notice a release once a day.
+   Coming back to the window is the closest thing to "opening" it, so re-check
+   then — throttled, and skipped entirely once we already know about one. */
+const FOCUS_RECHECK = 30 * 60 * 1000;
+function checkUpdatesOnFocus(){
+  if (pendingUpdate || !prefs.checkUpdates) return;
+  if (Date.now() - lastUpdateCheck < FOCUS_RECHECK) return;
+  checkUpdates(false);
 }
 
 async function runUpdate(){
@@ -1358,9 +1381,11 @@ async function boot(){
   });
   window.addEventListener("focus", () => checkExternal());
 
-  /* out of the way of startup, then once a day */
-  setTimeout(() => checkUpdates(false), 4000);
+  /* Promptly after boot rather than four seconds in, then on every return to
+     the window, then daily for a window that is never left. */
+  setTimeout(() => checkUpdates(false), 1200);
   setInterval(() => checkUpdates(false), 24 * 60 * 60 * 1000);
+  window.addEventListener("focus", checkUpdatesOnFocus);
 }
 
 function wireUI(){
@@ -1397,6 +1422,7 @@ function wireUI(){
   $("#btn-help").onclick = () => openPalette("commands");
   $("#up-go").onclick = () => runUpdate();
   $("#up-close").onclick = () => hideUpdate();
+  $("#st-update").onclick = () => { if (pendingUpdate) showUpdate(pendingUpdate); };
   $("#up-notes").onclick = () => api.updates.openPage();
   api.on.updateProgress(({ pct }) => { $("#up-fill").style.width = Math.round(pct * 100) + "%"; });
   $("#docname").ondblclick = () => startInlineRename();

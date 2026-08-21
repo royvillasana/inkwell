@@ -149,6 +149,7 @@ async function runSmoke(win){
   } catch (err) {
     console.log("smoke: could not build the fixture vault: " + err.message);
   }
+  prelude += "globalThis.__fakeUpdate = " + JSON.stringify(process.env.INKWELL_FAKE_UPDATE || null) + ";\n";
   try {
     const report = await win.webContents.executeJavaScript(prelude + script, true);
     console.log("SMOKE " + JSON.stringify(report, null, 2));

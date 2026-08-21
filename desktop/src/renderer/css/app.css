@@ -81,6 +81,16 @@ body.no-sidebar #sidebar{margin-left:-264px}
 .brand{display:flex;align-items:center;gap:8px;font-weight:650;letter-spacing:-.01em}
 .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .brand small{color:var(--ink-faint);font-weight:400;font-size:11px}
+#st-update{
+  color:var(--accent);font-weight:600;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px
+}
+#st-update::before{
+  content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)
+}
+#st-update:hover{text-decoration:underline}
+
 /* The vault bar: the sidebar's first line, so which vault you are in is never
    a question. It is a menu button, not a label — everything you can do to a
    vault hangs off it. */

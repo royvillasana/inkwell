@@ -23,6 +23,7 @@ const DEFAULTS = {
   spellcheck: true,
   goal: 0,
   autosave: true,
+  checkUpdates: true,
   autosaveDelay: 1200,
   imageFolder: "assets",
   recent: [],

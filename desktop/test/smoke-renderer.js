@@ -181,6 +181,32 @@
     check("the vault checks ran without throwing", false, err.message);
   }
 
+  /* ---- the update notice -------------------------------------------------
+     Only under INKWELL_FAKE_UPDATE, which stands in for a newer release so the
+     whole flow is exercisable without publishing one. */
+  const fake = globalThis.__fakeUpdate;
+  check("update flow is exercisable", typeof fake !== "undefined");
+  if (fake) try {
+    const card = $("#updater"), chip = $("#st-update");
+    /* nothing below clicked anything: the card is expected to have shown itself
+       during boot, which is the whole point */
+    check("the update card shows itself on open", !card.hidden);
+    check("the card names the new version", $("#up-title").textContent.includes(fake),
+      JSON.stringify($("#up-title").textContent));
+    check("no marker while the card is up", chip.hidden);
+
+    $("#up-close").click();
+    check("dismissing puts the card away", card.hidden);
+    check("dismissing leaves a marker instead of forgetting",
+      !chip.hidden && chip.textContent === "Update to " + fake, JSON.stringify(chip.textContent));
+
+    chip.click();
+    check("the marker brings the card back", !card.hidden && chip.hidden);
+    $("#up-close").click();
+  } catch (err) {
+    check("the update checks ran without throwing", false, err.message);
+  }
+
   return {
     failures,
     checks: ran - failures.length,
