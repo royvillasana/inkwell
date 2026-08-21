@@ -18,6 +18,7 @@ const store = require("./store");
 const files = require("./files");
 const search = require("./search");
 const { buildMenu } = require("./menu");
+const updates = require("./updates");
 const pandoc = require("./pandoc");
 
 const isDev = process.argv.includes("--dev");
@@ -347,6 +348,19 @@ handle("print", async html => {
     });
   });
 });
+
+handle("updates:check", () => updates.check());
+
+handle("updates:download", async asset => {
+  const win = focused();
+  const res = await updates.download(asset, (pct, got, total) => {
+    if (win && !win.isDestroyed()) win.webContents.send("update:progress", { pct, got, total });
+  });
+  return res;
+});
+
+handle("updates:install", file => updates.install(file));
+handle("updates:page", () => { shell.openExternal(updates.RELEASES_PAGE); return true; });
 
 handle("assets:css", () =>
   /* app.css is document styling and themes; desktop.css is window chrome and is

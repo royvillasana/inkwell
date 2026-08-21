@@ -754,6 +754,7 @@ function savePrefs(){
     lineNumbers: prefs.lineNumbers, autopair: prefs.autopair, spellcheck: prefs.spellcheck,
     goal: prefs.goal, autosave: prefs.autosave, autosaveDelay: prefs.autosaveDelay,
     view: currentView(),
+    checkUpdates: prefs.checkUpdates,
     smartPunctuation: prefs.smartPunctuation, pasteAsMarkdown: prefs.pasteAsMarkdown,
     numberHeadings: prefs.numberHeadings
   }).catch(() => {});
@@ -803,7 +804,9 @@ async function settingsDialog(){
       { name: "pasteAsMarkdown", label: "Convert pasted rich text to markdown", type: "checkbox", value: prefs.pasteAsMarkdown },
       { name: "numberHeadings", label: "Number headings automatically", type: "checkbox", value: prefs.numberHeadings },
       { name: "lineNumbers", label: "Line numbers in code blocks", type: "checkbox", value: prefs.lineNumbers },
-      { name: "spellcheck", label: "Check spelling while writing", type: "checkbox", value: prefs.spellcheck }
+      { name: "spellcheck", label: "Check spelling while writing", type: "checkbox", value: prefs.spellcheck },
+      { name: "checkUpdates", label: "Check GitHub for new versions", type: "checkbox", value: prefs.checkUpdates,
+        hint: "The only network request Inkwell makes. Nothing about you or your notes is sent." }
     ],
     buttons: [{ label: "Cancel", value: "cancel" }, { label: "Apply", value: "ok", primary: true }]
   });
@@ -814,7 +817,7 @@ async function settingsDialog(){
     followSystemTheme: r.followSystemTheme, autopair: r.autopair,
     lineNumbers: r.lineNumbers, spellcheck: r.spellcheck,
     smartPunctuation: r.smartPunctuation, pasteAsMarkdown: r.pasteAsMarkdown,
-    numberHeadings: r.numberHeadings
+    numberHeadings: r.numberHeadings, checkUpdates: r.checkUpdates
   });
   applyPrefs();
   const wasActive = state.activeId;
@@ -868,6 +871,7 @@ const COMMANDS = [
   { name: "Insert diagram", key: "", run: () => insertBlockAfter("```mermaid\ngraph TD\n  A[Start] --> B[End]\n```") },
   { name: "Insert table of contents", key: "", run: () => insertBlockAfter("[TOC]") },
   { name: "Insert image from file…", key: "", run: () => insertImage() },
+  { name: "Check for updates…", key: "", run: () => checkUpdates(true) },
   { name: "Keyboard shortcuts", key: "", run: () => showHelp() }
 ];
 
@@ -1134,6 +1138,7 @@ const MENU = {
   "next-tab": () => cycleTab(1),
   "prev-tab": () => cycleTab(-1),
   "help": () => showHelp(),
+  "check-updates": () => checkUpdates(true),
   "ins-table": () => insertBlockAfter("| Column | Column |\n| --- | --- |\n| cell | cell |"),
   "ins-code": () => insertBlockAfter("```js\n\n```"),
   "ins-math": () => insertBlockAfter("$$\n\n$$"),
@@ -1218,6 +1223,62 @@ function mountTips(){
   document.addEventListener("focusout", hide);
 }
 
+/* ---- updates --------------------------------------------------------------
+   Inkwell makes exactly one network request, and this is it: GitHub's releases
+   API, no identifiers attached, off entirely if you would rather. Applying the
+   update in place needs a Developer ID signature, which these builds do not
+   have, so the CTA downloads the disk image and opens it for you. */
+let pendingUpdate = null;
+let updateBusy = false;
+
+function showUpdate(info){
+  pendingUpdate = info;
+  $("#up-title").textContent = "Inkwell " + info.latest + " is out";
+  $("#up-body").textContent = "You are on " + info.current +
+    (info.asset ? ". Download it and Inkwell will open the installer for you." : ". Open the release page to get it.");
+  $("#up-go").textContent = info.asset ? "Update" : "Open release";
+  $("#up-go").disabled = false;
+  $("#up-bar").hidden = true;
+  $("#up-fill").style.width = "0";
+  $("#updater").hidden = false;
+}
+const hideUpdate = () => { $("#updater").hidden = true; };
+
+async function checkUpdates(loud){
+  if (!prefs.checkUpdates && !loud) return;
+  try {
+    const info = await api.updates.check();
+    if (info.newer) showUpdate(info);
+    else if (loud) say("You are on " + info.current + ", the newest release.", "Up to date");
+  } catch (err) {
+    if (loud) say(err.message, "Could not check for updates");
+  }
+}
+
+async function runUpdate(){
+  if (!pendingUpdate || updateBusy) return;
+  if (!pendingUpdate.asset) return api.updates.openPage();
+
+  updateBusy = true;
+  const go = $("#up-go");
+  go.disabled = true;
+  go.textContent = "Downloading…";
+  $("#up-bar").hidden = false;
+  try {
+    const file = await api.updates.download(pendingUpdate.asset);
+    go.textContent = "Opening…";
+    await api.updates.install(file.path);
+    $("#up-body").textContent = "Drag Inkwell to Applications to finish, then reopen it.";
+    go.textContent = "Done";
+  } catch (err) {
+    $("#up-body").textContent = "That did not work: " + err.message;
+    go.textContent = "Open release";
+    go.disabled = false;
+    pendingUpdate = Object.assign({}, pendingUpdate, { asset: null });
+  }
+  updateBusy = false;
+}
+
 /* --------------------------------------------------------------------- boot */
 async function boot(){
   document.body.classList.toggle("mac", IS_MAC);
@@ -1296,6 +1357,10 @@ async function boot(){
     setTheme(dark ? "night" : "paper");
   });
   window.addEventListener("focus", () => checkExternal());
+
+  /* out of the way of startup, then once a day */
+  setTimeout(() => checkUpdates(false), 4000);
+  setInterval(() => checkUpdates(false), 24 * 60 * 60 * 1000);
 }
 
 function wireUI(){
@@ -1319,6 +1384,10 @@ function wireUI(){
   $("#btn-wide").onclick = () => toggleWide();
   $("#btn-prefs").onclick = () => settingsDialog();
   $("#btn-help").onclick = () => openPalette("commands");
+  $("#up-go").onclick = () => runUpdate();
+  $("#up-close").onclick = () => hideUpdate();
+  $("#up-notes").onclick = () => api.updates.openPage();
+  api.on.updateProgress(({ pct }) => { $("#up-fill").style.width = Math.round(pct * 100) + "%"; });
   $("#docname").ondblclick = () => startInlineRename();
   $("#docname").dataset.tip = "Double-click to rename";
 

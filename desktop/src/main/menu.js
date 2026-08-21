@@ -153,6 +153,8 @@ function buildMenu(handlers){
   template.push({
     role: "help",
     submenu: [
+      item("Check for Updates…", null, "check-updates"),
+      { type: "separator" },
       item("Keyboard Shortcuts", null, "help"),
       item("Command Palette", "CmdOrCtrl+Shift+P", "palette"),
       { type: "separator" },

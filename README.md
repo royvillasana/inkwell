@@ -103,6 +103,12 @@ downloads: `npm approve-scripts electron`.
 - **Native menus**, recent files, multiple windows, session restore, file
   associations for `.md`, and PDF export rendered by the app rather than a
   browser print dialog.
+- **Update notices.** Inkwell asks GitHub's releases API whether a newer
+  version exists, and shows a small card in the bottom left if so. Its button
+  downloads the disk image and opens it. This is the only network request the
+  app makes, it carries no identifiers, and Preferences can switch it off.
+  Applying an update in place would need a Developer ID signature, which these
+  builds do not have — see the note under Packaging.
 
 ### Layout
 
@@ -163,6 +169,12 @@ npm run dist:linux   # AppImage + deb
 
 Unsigned builds warn on first launch. Add signing credentials to the `build`
 block in `package.json` before shipping to anyone else.
+
+Ad-hoc signing is what makes the app launch at all (`scripts/adhoc-sign.js`),
+but it is not enough for Squirrel.Mac to replace the app in place, so the
+updater downloads and opens the DMG rather than installing silently. With a
+Developer ID and notarisation, that last step could become a real
+auto-update.
 
 ### Sample content
 

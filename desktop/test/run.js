@@ -177,6 +177,53 @@ async function test(name, fn){
     assert.strictEqual(search.search("typography").total, 0);
   });
 
+  console.log("\nupdates.js");
+  /* updates.js pulls in electron; test the pure logic by loading the source
+     and evaluating just the comparison, which is where these go wrong */
+  const upSrc = fs.readFileSync(path.join(__dirname, "..", "src", "main", "updates.js"), "utf8");
+  const cmpBody = upSrc.slice(upSrc.indexOf("function compareVersions"), upSrc.indexOf("function request"));
+  const compareVersions = new Function(cmpBody + "; return compareVersions;")();
+  const pickBody = upSrc.slice(upSrc.indexOf("function pickAsset"), upSrc.indexOf("async function check"));
+
+  await test("a newer version is detected", () => {
+    assert.strictEqual(compareVersions("2.1.3", "2.1.2"), 1);
+    assert.strictEqual(compareVersions("2.2.0", "2.1.9"), 1);
+    assert.strictEqual(compareVersions("3.0.0", "2.9.9"), 1);
+  });
+
+  await test("the same version is not an update", () => {
+    assert.strictEqual(compareVersions("2.1.2", "2.1.2"), 0);
+    assert.strictEqual(compareVersions("v2.1.2", "2.1.2"), 0, "a v prefix must not matter");
+  });
+
+  await test("an older version never prompts", () => {
+    assert.strictEqual(compareVersions("2.1.1", "2.1.2"), -1);
+    assert.strictEqual(compareVersions("1.9.9", "2.0.0"), -1);
+  });
+
+  await test("10 is newer than 9, not older", () => {
+    /* string comparison would call 2.1.10 older than 2.1.9 */
+    assert.strictEqual(compareVersions("2.1.10", "2.1.9"), 1);
+    assert.strictEqual(compareVersions("2.10.0", "2.9.0"), 1);
+  });
+
+  await test("a build suffix does not make a version newer", () => {
+    assert.strictEqual(compareVersions("2.1.2-beta.1", "2.1.2"), 0);
+  });
+
+  await test("the download picks the asset for this machine", () => {
+    /* the slice carries the FAKE constant too, so the stub needs an env */
+    const pickAsset = new Function("process", pickBody + "; return pickAsset;")(
+      { platform: "darwin", arch: "arm64", env: {} });
+    const assets = [
+      { name: "Inkwell-2.1.3-x64.dmg" },
+      { name: "Inkwell-2.1.3-arm64.dmg" },
+      { name: "Inkwell-2.1.3.zip" }
+    ];
+    assert.strictEqual(pickAsset(assets).name, "Inkwell-2.1.3-arm64.dmg");
+    assert.strictEqual(pickAsset([]), null, "no assets must not throw");
+  });
+
   console.log("\nrenderer assets");
   const cssPath = path.join(__dirname, "..", "src", "renderer", "css", "app.css");
   const css = fs.readFileSync(cssPath, "utf8");

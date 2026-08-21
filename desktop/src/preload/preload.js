@@ -85,6 +85,13 @@ contextBridge.exposeInMainWorld("inkwell", {
     katexCss: () => call("assets:katexCss")
   },
 
+  updates: {
+    check: () => call("updates:check"),
+    download: asset => call("updates:download", asset),
+    install: file => call("updates:install", file),
+    openPage: () => call("updates:page")
+  },
+
   win: {
     create: () => call("window:new"),
     title: (title, filePath) => call("window:title", title, filePath),
@@ -101,6 +108,7 @@ contextBridge.exposeInMainWorld("inkwell", {
     menu: fn => listen("menu", fn),
     openPaths: fn => listen("open-paths", fn),
     vaultChanged: fn => listen("vault:changed", fn),
-    themeChanged: fn => listen("theme:changed", fn)
+    themeChanged: fn => listen("theme:changed", fn),
+    updateProgress: fn => listen("update:progress", fn)
   }
 });

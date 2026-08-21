@@ -31,7 +31,8 @@ export const prefs = {
   lineNumbers: false, autopair: true, spellcheck: true, goal: 0,
   autosave: true, autosaveDelay: 1200, source: false, split: false,
   smartPunctuation: false, pasteAsMarkdown: true, numberHeadings: false,
-  rich: undefined      // undefined means "not chosen yet" — boot picks rich
+  rich: undefined,     // undefined means "not chosen yet" — boot picks styled
+  checkUpdates: true
 };
 
 /* ---- events -------------------------------------------------------------- */
