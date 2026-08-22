@@ -93,6 +93,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
         working-directory: .
 
+      # Chromium's setuid sandbox helper has to be owned by root and mode 4755,
+      # and npm cannot install a file that way. The usual answer is to run with
+      # --no-sandbox; that is the wrong answer here. A sandboxed renderer is one
+      # of the things these tests exist to hold in place, and switching it off
+      # to make the job go green would leave us testing something other than
+      # what ships. So the helper is given the permissions it wants instead.
+      - name: Let Electron keep its sandbox
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       # Boots the real app, asserts the renderer came up, and checks 72 things
       # in it — including that a document from a connection cannot put raw HTML
       # into the page, and that a build without --connections is inert.
