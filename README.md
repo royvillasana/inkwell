@@ -39,7 +39,8 @@ The markdown parser is hand-written and shared by both builds. Where they part
 company is maths and diagrams: the light build renders LaTeX to native MathML
 and draws its own flowcharts, so it stays a single file with nothing bundled;
 the desktop build ships real KaTeX and real Mermaid. Neither fetches anything
-from a network.
+from a network on its own — the desktop build checks GitHub for updates if you
+let it, and reaches a *connection* only once you have added one yourself.
 
 ---
 
@@ -130,10 +131,10 @@ that gives Claude Code — or any MCP client — vault-aware access to your note
 claude mcp add inkju --scope user -- node /path/to/desktop/src/mcp/server.mjs
 ```
 
-That path is a **source checkout** with `npm install` run in `desktop/` — the
-server needs the MCP SDK from `node_modules`. The copy inside the packaged
-`.app` cannot run on its own: the SDK is a build-time dependency and is not
-shipped in the bundle.
+That path can be a **source checkout** with `npm install` run in `desktop/`, or
+the copy inside the packaged `.app` — since the app became an MCP client in its
+own right (see *Connections* below) the SDK ships in the bundle, so the server
+there runs on its own.
 
 With no `--vault` argument it serves whichever vault Inkju currently has
 open, and keeps doing so: it re-reads the app's choice on every call, so
@@ -241,6 +242,112 @@ backlinks have something to show on a first run. Point the app at your own
 folder whenever you like — nothing about a vault is special, it is just a
 directory of markdown files.
 
+
+### Connections — notes that live somewhere else
+
+The section above is Inkju as an MCP *server*: an agent working inside your
+vault. This is the other direction. Inkju is also an MCP **client**, so it can
+open the markdown you keep in Google Drive, or anywhere else that speaks the
+protocol, without you moving files around by hand.
+
+It is off unless you ask for it:
+
+```bash
+npm start -- --connections          # or set INKJU_CONNECTIONS=1
+```
+
+Then **Preferences → Connections…**, or `⌘K` and type *Connections*.
+
+With no connections configured Inkju makes no network request except the
+update check. Every connection is one place you have chosen to let it reach,
+and it can be switched off or removed at any time.
+
+#### Google Drive
+
+Google runs an official remote Drive MCP server at
+`https://drivemcp.googleapis.com/mcp/v1`. Inkju ships it as a preset, and the
+setup walkthrough links straight to the console page you need.
+
+You bring your own OAuth client. Inkju does not ship one, because a client
+secret inside an app anyone can download is not a secret — this way nothing
+about your Drive passes through us. In the Google Cloud console: create a
+project, enable the Drive API, configure the consent screen with yourself as a
+test user, then create an **OAuth client ID of type Desktop app**. Paste the
+client ID and secret into the walkthrough.
+
+Scopes are `drive.readonly` and `drive.file`. Sign-in happens in your real
+browser — never in a window Inkju controls — and comes back to a loopback
+listener that exists for that one sign-in and is torn down afterwards.
+
+Google's Drive MCP server is part of the Workspace Developer Preview Program.
+It can change, and it may not be open to every account yet. The preset is a
+JSON file (`desktop/src/main/presets/connections.json`), so when Google changes
+something, that file changes rather than a release.
+
+#### Any other MCP server
+
+**Another MCP server** takes an `https://` address and works out how to sign in
+by asking the server, following the MCP authorization spec. **A program on this
+Mac** runs a local server over stdio; Inkju shows you the exact command before
+it runs anything and installs nothing on your behalf.
+
+#### What a connection is allowed to do
+
+Nothing, until you say so. On connecting, Inkju asks the server what tools it
+has and shows you the list. Read tools are proposed ticked; anything that
+changes files is proposed unticked and labelled. A tool the server adds later
+arrives switched off and you are told about it.
+
+Beyond that, every write asks — naming the file and the connection. You can
+turn that off per connection; you cannot turn it off for deletions.
+
+Credentials are encrypted by the operating system's own key store (Keychain,
+DPAPI, libsecret) and kept in their own file, never in `settings.json`. If the
+OS cannot encrypt them, Inkju keeps them in memory for the session and says so
+rather than writing them in the clear. Nothing credential-shaped is ever handed
+to the part of the app that draws the window.
+
+#### Opening a file from a connection
+
+It opens in an ordinary tab and everything works — except three things, on
+purpose:
+
+- **Autosave is off.** Saving to a local file is cheap and reversible; writing
+  over a network into someone else's store is neither. Remote tabs save on `⌘S`.
+- **Conflicts are a question, never a silent overwrite.** Before writing, Inkju
+  re-checks the file. If it moved, you choose: keep yours, take theirs, or save
+  a copy into your vault. A connection that cannot tell Inkju whether the file
+  changed is treated as though it always might have, so it asks every time.
+- **Version history, backlinks and vault search stay vault-only.** They are
+  built on the folder on your disk. Save a copy into your vault to have Inkju
+  track it.
+
+A file that is not text, or is larger than 2 MB, is not opened in the editor —
+Inkju offers to save a copy into your vault instead.
+
+### iCloud Drive
+
+Inkju can keep a vault in iCloud Drive, and the Connections list is where you
+will find it. It is worth being plain about what that is and is not.
+
+Apple publishes no API that lets another app reach your iCloud Drive documents.
+CloudKit reaches a developer's own container, never your Documents. So there is
+no iCloud account to connect and nothing here speaks MCP: what Inkju opens is
+the folder macOS already keeps at
+`~/Library/Mobile Documents/com~apple~CloudDocs/`.
+
+Within that limit it behaves properly, which mostly means not doing the obvious
+wrong thing:
+
+- A note iCloud has **evicted** still appears in the sidebar, marked as not
+  downloaded. Opening it fetches it, and says so while it does.
+- **Indexing never downloads anything.** Opening a large, mostly-evicted vault
+  would otherwise pull the whole thing onto your disk in the background, unasked.
+- **Conflicted copies are surfaced as conflicts**, not shown as ordinary notes,
+  and Inkju never merges or deletes either side. That is your call.
+- Saves stay **atomic**. Measured against a real iCloud Drive: the temporary
+  file lives about 4 ms even for a 4 MB note, and nothing is left behind.
+
 ---
 
 ## Typora parity
@@ -320,7 +427,11 @@ Without it, HTML, PDF, `.doc`, markdown and plain text still work.
   loose lists come back tight, and reference-style links become inline. Diagrams
   and display maths appear as editable code blocks there rather than rendered —
   the block editor still renders them.
-- Raw HTML in a document is escaped and shown as text rather than executed.
+- Raw HTML *inline* is always escaped and shown as text. A raw HTML **block**
+  passes through in a note of your own, which is what markdown is supposed to
+  do — but never in a document opened through a connection, where it is shown
+  as text. Link schemes that would run code (`javascript:`, `vbscript:`,
+  scripted `data:`) are neutralised everywhere.
 
 ---
 

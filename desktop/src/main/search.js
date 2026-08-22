@@ -6,6 +6,7 @@
 const fsp = require("fs").promises;
 const path = require("path");
 const files = require("./files");
+const icloud = require("./icloud");
 
 let root = null;
 let docs = new Map();          // absolute path -> { name, base, text, mtime }
@@ -27,6 +28,12 @@ async function build(){
     const list = files.flatten(tree);
     docs = new Map();
     for (const f of list) {
+      /* A note iCloud has evicted has no bytes on this machine, and reading it
+         would make macOS fetch them. Indexing a mostly-evicted vault would
+         then download the entire thing — in the background, unasked, while the
+         user was only opening a folder. It is left out of the index instead:
+         it is still listed in the sidebar, and opening it downloads it. */
+      if (f.downloaded === false || icloud.isEvicted(f.path)) continue;
       try {
         const stat = await fsp.stat(f.path);
         const text = await fsp.readFile(f.path, "utf8");
@@ -41,6 +48,8 @@ async function build(){
 
 async function touch(file){
   if (!root || !file.startsWith(root)) return;
+  /* same reason as build(): re-indexing must never be what pulls a file down */
+  if (icloud.isEvicted(file)) { docs.delete(file); return; }
   try {
     const stat = await fsp.stat(file);
     docs.set(file, { name: path.basename(file), base: baseName(file), text: await fsp.readFile(file, "utf8"), mtime: stat.mtimeMs });

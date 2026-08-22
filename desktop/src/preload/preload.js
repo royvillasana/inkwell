@@ -60,6 +60,44 @@ contextBridge.exposeInMainWorld("inkju", {
     reindex: () => call("vault:reindex")
   },
 
+  /* Outside sources. Every reply here has already been through the public
+     shape in connections.js, so what arrives is a label, a status and a list
+     of tool names — never a token, a client secret or a transport handle.
+     Secrets only ever travel outward, one at a time, on setSecret. */
+  connections: {
+    enabled: () => call("connections:enabled"),
+    list: () => call("connections:list"),
+    get: id => call("connections:get", id),
+    add: input => call("connections:add", input),
+    update: (id, patch) => call("connections:update", id, patch),
+    remove: id => call("connections:remove", id),
+    connect: id => call("connections:connect", id),
+    authorize: id => call("connections:authorize", id),
+    disconnect: id => call("connections:disconnect", id),
+    proposeAllow: (id, needs) => call("connections:proposeAllow", id, needs),
+    setSecret: (id, key, value) => call("connections:setSecret", id, key, value),
+    secretKeys: id => call("connections:secretKeys", id),
+    presets: () => call("connections:presets")
+  },
+
+  /* Files that live in a connection, never on this disk. */
+  cloud: {
+    capabilities: id => call("cloud:capabilities", id),
+    list: (id, opts) => call("cloud:list", id, opts),
+    read: (id, remoteId, entry) => call("cloud:read", id, remoteId, entry),
+    write: (id, remoteId, text, opts) => call("cloud:write", id, remoteId, text, opts),
+    conflict: (id, remoteId, version) => call("cloud:conflict", id, remoteId, version),
+    import: (id, remoteId, entry) => call("cloud:import", id, remoteId, entry)
+  },
+
+  /* iCloud Drive. A folder that syncs, not a connection — kept separate in the
+     bridge for the same reason it is kept separate in the interface. */
+  icloud: {
+    info: () => call("icloud:info"),
+    openVault: () => call("icloud:openVault"),
+    conflicts: dir => call("icloud:conflicts", dir)
+  },
+
   image: {
     save: (noteFile, data, ext) => call("image:save", noteFile, data, ext),
     pick: noteFile => call("image:pick", noteFile)
@@ -112,6 +150,10 @@ contextBridge.exposeInMainWorld("inkju", {
     openPaths: fn => listen("open-paths", fn),
     vaultChanged: fn => listen("vault:changed", fn),
     themeChanged: fn => listen("theme:changed", fn),
-    updateProgress: fn => listen("update:progress", fn)
+    updateProgress: fn => listen("update:progress", fn),
+    connectionStatus: fn => listen("connections:status", fn),
+    connectionsChanged: fn => listen("connections:changed", fn),
+    connectionToolsAppeared: fn => listen("connections:tools-appeared", fn),
+    icloudDownloading: fn => listen("icloud:downloading", fn)
   }
 });

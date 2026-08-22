@@ -155,6 +155,9 @@ body.no-sidebar #sidebar{margin-left:-264px}
   border:1px dashed var(--rule);border-radius:7px;color:var(--ink-soft);font-size:12px
 }
 .side-action:hover{border-color:var(--accent);color:var(--accent)}
+/* display:flex above beats the hidden attribute, so a hidden side-action stayed
+   on screen. The cloud browser hides these while it has the pane. */
+.side-action[hidden],#tree[hidden]{display:none}
 .side-foot{padding:8px;border-top:1px solid var(--rule);display:flex;gap:4px;align-items:center}
 .theme-dot{width:18px;height:18px;border-radius:50%;border:1px solid var(--rule);cursor:pointer}
 .theme-dot.on{outline:2px solid var(--accent);outline-offset:2px}
@@ -413,7 +416,7 @@ body.mode-source #source{display:block}
 #modal label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-soft)}
 #modal label.row{flex-direction:row;align-items:center;gap:9px}
 #modal label.row span{flex:1}
-#modal input[type=text],#modal input[type=number],#modal select,#modal textarea{
+#modal input[type=text],#modal input[type=number],#modal input[type=password],#modal select,#modal textarea{
   background:var(--page);border:1px solid var(--rule);border-radius:7px;padding:8px 10px;
   font-size:13px;outline:none;width:100%;font-family:inherit
 }
@@ -610,3 +613,99 @@ body.mode-split #splitwrap{display:flex}
   font-size:.86em;text-decoration:none;font-family:var(--font-ui)
 }
 .rendered .tag:hover{filter:brightness(.94)}
+
+/* ---------- Connections ----------
+   Built entirely from the existing tokens, so all four themes get it for free
+   and none of it needs a light and a dark variant. */
+
+.conn-list{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow-y:auto}
+
+.conn-row{
+  padding:11px 12px;border:1px solid var(--rule);border-radius:9px;
+  display:flex;flex-direction:column;gap:3px
+}
+.conn-row.off{opacity:.55}
+.conn-head{display:flex;align-items:center;gap:8px}
+.conn-name{font-weight:600;color:var(--ink)}
+.conn-status{color:var(--ink-faint);font-size:11.5px}
+.conn-what{color:var(--ink-soft);font-size:11.5px;word-break:break-all}
+.conn-detail{color:var(--ink-faint);font-size:11.5px;line-height:1.5}
+.conn-tools{color:var(--ink-faint);font-size:11.5px}
+
+/* One dot, five states. Colour alone never carries the meaning — the word is
+   always beside it, and the dot has a title for a pointer. */
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+.conn-dot.connected{background:#3f9a5c}
+.conn-dot.connecting{background:var(--accent);animation:conn-pulse 1.2s ease-in-out infinite}
+.conn-dot.needs-authorization{background:#c98a2b}
+.conn-dot.failed{background:#b4483c}
+@keyframes conn-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.conn-dot.connecting{animation:none}}
+
+.conn-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.conn-acts .ghost{
+  padding:4px 9px;border:1px solid var(--rule);border-radius:6px;
+  font-size:11.5px;color:var(--ink-soft);white-space:nowrap;flex:none
+}
+.conn-acts .ghost:hover{border-color:var(--accent);color:var(--accent)}
+.conn-acts .ghost.danger:hover{border-color:#b4483c;color:#b4483c}
+.conn-foot{display:block;color:var(--ink-faint);font-size:11.5px;line-height:1.6;margin-top:10px}
+
+/* The permissions editor. A tool that changes files is marked, every time. */
+.conn-perms{display:flex;flex-direction:column;gap:2px;max-height:44vh;overflow-y:auto}
+.conn-perm{display:flex;gap:9px;align-items:flex-start;padding:7px 8px;border-radius:7px}
+.conn-perm:hover{background:var(--accent-soft)}
+.conn-perm > span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.perm-name{font-family:var(--mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;color:var(--ink)}
+.perm-tag{
+  align-self:flex-start;font-size:10.5px;letter-spacing:.02em;text-transform:uppercase;
+  padding:1px 6px;border-radius:20px;border:1px solid #c98a2b;color:#c98a2b
+}
+.perm-tag.new{border-color:var(--accent);color:var(--accent)}
+.conn-perm small{color:var(--ink-faint);font-size:11.5px;line-height:1.5}
+
+/* The setup walkthrough for a preset. */
+.conn-setup{display:flex;flex-direction:column;gap:8px;font-size:12.5px;line-height:1.65;color:var(--ink-soft)}
+.conn-setup strong{color:var(--ink);font-size:13.5px}
+.conn-setup ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.conn-link{color:var(--accent);text-decoration:underline;align-self:flex-start}
+.conn-caveat{color:var(--ink-faint);font-size:11.5px;line-height:1.55}
+.conn-cmd{
+  margin:0;padding:9px 11px;border:1px solid var(--rule);border-radius:7px;
+  background:var(--accent-soft);font-family:var(--mono,ui-monospace,SFMono-Regular,Menlo,monospace);
+  font-size:12px;white-space:pre-wrap;word-break:break-all;color:var(--ink)
+}
+
+.prefs-jump{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.prefs-jump small{color:var(--ink-faint);font-size:11.5px;line-height:1.55}
+
+/* ---------- The cloud browser, in the Files pane ---------- */
+#cloud-browser{display:flex;flex-direction:column;gap:6px;padding:2px}
+.cloud-head{display:flex;align-items:center;gap:7px}
+.cloud-head .ghost{color:var(--ink-soft);font-size:12px;padding:2px 4px}
+.cloud-head .ghost:hover{color:var(--accent)}
+.cloud-name{font-weight:600;font-size:12.5px;color:var(--ink);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cloud-q{
+  width:100%;padding:6px 8px;border:1px solid var(--rule);border-radius:7px;
+  background:transparent;color:var(--ink);font-size:12px
+}
+#cloud-q:focus{outline:none;border-color:var(--accent)}
+.cloud-results{display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.cloud-row{
+  display:flex;flex-direction:column;gap:1px;align-items:flex-start;
+  width:100%;padding:6px 8px;border-radius:6px;text-align:left
+}
+.cloud-row:hover{background:var(--accent-soft)}
+.cloud-row.folder .cloud-file::before{content:"› ";color:var(--ink-faint)}
+.cloud-file{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:100%}
+.cloud-row small{color:var(--ink-faint);font-size:11px}
+
+/* A tab whose document is not on this disk says where it is. */
+.tab .tab-src{
+  font-size:10.5px;color:var(--ink-faint);padding:0 5px;margin-left:1px;
+  border-left:1px solid var(--rule);max-width:9ch;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap
+}
+#docname .src{color:var(--ink-faint);font-weight:400;font-size:11.5px;margin-left:6px}

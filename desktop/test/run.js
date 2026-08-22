@@ -411,6 +411,27 @@ async function test(name, fn){
     assert.ok(/open '\/Apps\/Roy/.test(text), "launcher defaults to open");
   });
 
+  console.log("\nsecrets.js");
+  await require("./secrets")(test);
+
+  console.log("\nconnections.js");
+  await require("./connections")(test);
+
+  console.log("\nmcp-client.js");
+  await require("./mcp-client")(test);
+
+  console.log("\noauth.js");
+  await require("./oauth")(test);
+
+  console.log("\ncloud.js");
+  await require("./cloud")(test);
+
+  console.log("\nicloud.js");
+  await require("./icloud")(test);
+
+  console.log("\nsecurity");
+  await require("./security")(test);
+
   await fsp.rm(root, { recursive: true, force: true });
   console.log("\n" + pass + " passed, " + fail + " failed\n");
   process.exit(fail ? 1 : 0);

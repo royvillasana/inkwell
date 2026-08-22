@@ -5,7 +5,7 @@
    This module owns the document and the caret. It knows nothing about files,
    tabs or the sidebar — those listen through on().
    =========================================================================== */
-import { splitBlocks, renderBlock, blockType, MULTILINE, RE_FENCE, RE_LI } from "./markdown.js";
+import { splitBlocks, renderBlock, blockType, setUntrusted, MULTILINE, RE_FENCE, RE_LI } from "./markdown.js";
 
 export const $  = s => document.querySelector(s);
 export const $$ = s => Array.from(document.querySelectorAll(s));
@@ -22,7 +22,13 @@ export const state = {
   path: null,
   mtime: 0,
   dirty: false,
-  committing: false
+  committing: false,
+  /* Set only for a document that came from a connection rather than this disk:
+     { connectionId, remoteId, version, writable, conflictBlind, label }.
+     A remote document has no path, which is why autosave — which requires one
+     — never fires for it. That is deliberate, not incidental: writing to
+     someone else's store on a timer is neither cheap nor reversible. */
+  remote: null
 };
 
 export const prefs = {
@@ -86,7 +92,18 @@ export function loadText(text, name, meta){
   state.blocks = splitBlocks(text).map(mkBlock);
   state.activeId = null;
   if (name) state.name = name;
-  if (meta) { state.path = meta.path || null; state.mtime = meta.mtime || 0; }
+  if (meta) {
+    state.path = meta.path || null;
+    state.mtime = meta.mtime || 0;
+    state.remote = meta.remote || null;
+  }
+  /* Every document passes through here on its way to being the open one, which
+     makes this the single place trust has to be decided. Raw HTML blocks pass
+     through for a note the user wrote and are shown as text for one that came
+     from a connection — and that now holds for every renderer, including the
+     split preview, presentation mode and the HTML export, rather than only the
+     ones that remembered to ask. */
+  setUntrusted(!!state.remote);
   state.dirty = false;
   renderAll();
   if (scroll) scroll.scrollTop = 0;

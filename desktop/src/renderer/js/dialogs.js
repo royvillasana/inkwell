@@ -69,6 +69,11 @@ export function dialog(opt){
     const wrap = document.createElement("div");
     wrap.className = "fields";
     for (const f of opt.fields) {
+      /* An escape hatch for a dialog that needs to show something a field list
+         cannot — a list of connections with their own buttons, for instance.
+         The node is appended as it is and contributes no value. */
+      if (f.type === "node") { wrap.appendChild(f.node); continue; }
+
       const lab = document.createElement("label");
       if (f.type === "checkbox" || f.type === "range") lab.className = "row";
       const span = document.createElement("span");
