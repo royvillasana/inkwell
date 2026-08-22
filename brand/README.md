@@ -18,7 +18,7 @@ Everything here is derived from two files you supplied, kept at the repo root:
 
 ## macOS — `macos/`
 
-`icon.icns` plus the `Inkwell.iconset` it was built from: 16, 32, 128, 256 and
+`icon.icns` plus the `Inkju.iconset` it was built from: 16, 32, 128, 256 and
 512pt, each at 1× and 2×, so every Retina step has real pixels rather than an
 upscale. `icon.icns` and `icon-1024.png` are copied to `desktop/build/`, which
 is where electron-builder picks them up.

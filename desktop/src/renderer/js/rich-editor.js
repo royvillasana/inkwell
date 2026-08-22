@@ -1,7 +1,7 @@
 /* ===========================================================================
    Rich text mode — TipTap (ProseMirror) editing over the same markdown files.
 
-   Inkwell's own editor reveals source one BLOCK at a time. This mode is the
+   Inkju's own editor reveals source one BLOCK at a time. This mode is the
    other half of that idea: syntax never appears at all, formatting is applied
    to the selection, and the document is still written back out as markdown.
 
@@ -87,7 +87,7 @@ export async function open(container, markdown, opts = {}){
     if (!a) return;
     e.preventDefault();
     const href = a.getAttribute("href");
-    if (/^https?:|^mailto:/.test(href) && window.inkwell) window.inkwell.system.openExternal(href);
+    if (/^https?:|^mailto:/.test(href) && window.inkju) window.inkju.system.openExternal(href);
   });
 
   return editor;

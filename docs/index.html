@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inkwell — see your words, not the syntax</title>
+<title>Inkju — see your words, not the syntax</title>
 <meta name="description" content="A markdown editor that shows the source only for the block you are editing. Everything else stays finished prose. Free, open source, no accounts, no telemetry.">
 <link rel="icon" href="assets/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
@@ -11,9 +11,9 @@
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#16171a">
-<meta property="og:title" content="Inkwell — see your words, not the syntax">
+<meta property="og:title" content="Inkju — see your words, not the syntax">
 <meta property="og:description" content="A markdown editor with vaults, real Mermaid and real KaTeX. Free and open source.">
-<meta property="og:image" content="https://royvillasana.github.io/inkwell/assets/screenshot.png">
+<meta property="og:image" content="https://royvillasana.github.io/inkju/assets/screenshot.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -345,7 +345,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
   /* The desktop layout used to be blown up to 190% and allowed to bleed off the
      right edge, so a phone showed a cropped view of a window it would never
      have. The editor has its own layout under 820px, so it now runs at the
-     phone's real width and shows what Inkwell actually looks like there —
+     phone's real width and shows what Inkju actually looks like there —
      whole, not a slice. */
   .stage{padding-inline:var(--pad);overflow:visible}
   .appwin{width:100%;max-width:none;margin:0;border-radius:12px}
@@ -365,7 +365,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 <body>
 
 <nav>
-  <a class="name" href="#top"><img src="assets/logo-feather.png" srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x" alt="" width="313" height="256"> Inkwell</a>
+  <a class="name" href="#top"><img src="assets/logo-feather.png" srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x" alt="" width="313" height="256"> Inkju</a>
   <span class="links">
     <a class="opt" href="#features">Features</a>
     <a class="opt" href="#builds">Builds</a>
@@ -381,7 +381,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
          srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x"
          alt="" width="313" height="256" fetchpriority="high">
     <h1>See your words,<br>not the <em class="acc">syntax</em></h1>
-    <p class="lede">Inkwell reveals markdown source only for the block you are editing.
+    <p class="lede">Inkju reveals markdown source only for the block you are editing.
       Everything else stays finished prose — click away and the asterisks disappear.</p>
     <div class="hero-cta">
       <a class="btn btn-amber" href="#download">
@@ -397,13 +397,13 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
     <figure class="appwin" id="demo-window">
       <figcaption class="appwin-bar">
         <span class="lights"><i></i><i></i><i></i></span>
-        <span class="appwin-title">Inkwell — running in your browser</span>
+        <span class="appwin-title">Inkju — running in your browser</span>
       </figcaption>
       <div class="appwin-body" id="demo-body">
         <!-- On a wide screen this is filled with the real editor; on a phone it
              stays a screenshot, because a 390px editor is no advertisement. -->
         <img class="appwin-shot" src="assets/screenshot.png"
-             alt="Inkwell with a vault open: file tree on the left, a rendered note in the centre"
+             alt="Inkju with a vault open: file tree on the left, a rendered note in the centre"
              width="2360" height="1640">
         <button class="appwin-veil" id="demo-veil" type="button" hidden>
           <span class="pulse"></span>
@@ -422,7 +422,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
       <h2>A notebook that keeps <em class="acc">out of the way</em></h2>
       <p class="lede">Your notes are plain markdown files in a folder you chose — no database,
         no sync service, nothing to lock you in. Everything works offline; the only request
-        Inkwell ever makes is asking GitHub whether there is a newer version, and you can
+        Inkju ever makes is asking GitHub whether there is a newer version, and you can
         turn that off.</p>
     </div>
 
@@ -482,7 +482,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
       </div>
     </div>
     <div class="shot">
-      <img src="assets/diagrams.png" alt="A Mermaid sequence diagram and KaTeX equations rendered inside Inkwell" width="2360" height="1640">
+      <img src="assets/diagrams.png" alt="A Mermaid sequence diagram and KaTeX equations rendered inside Inkju" width="2360" height="1640">
     </div>
   </div>
 </section>
@@ -503,7 +503,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
       <div class="build desk">
         <div class="tag">Desktop</div>
         <h3>The full editor</h3>
-        <div class="sub">macOS · Apple Silicon · 115 MB</div>
+        <div class="sub">macOS · Apple Silicon · 126 MB</div>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Reads and writes real files, with autosave</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>Vaults, vault-wide search, backlinks</li>
@@ -597,14 +597,14 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 <section class="panel panel-night" id="download">
   <div class="glow" style="left:auto;right:-16%;top:0"></div>
   <div class="wrap download">
-    <div class="eyebrow" style="justify-content:center">Get Inkwell</div>
+    <div class="eyebrow" style="justify-content:center">Get Inkju</div>
     <h2>Start writing in <em class="acc">about a minute</em></h2>
     <div class="hero-cta">
-      <a class="btn btn-amber" href="https://github.com/royvillasana/inkwell/releases/download/v2.1.9/Inkwell-2.1.9-arm64.dmg">
+      <a class="btn btn-amber" href="https://github.com/royvillasana/inkju/releases/download/v2.2.0/Inkju-2.2.0-arm64.dmg">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 12l5 5 5-5"/><path d="M4 20h16"/></svg>
-        Inkwell 2.1.9 for Mac
+        Inkju 2.2.0 for Mac
       </a>
-      <a class="btn btn-line" href="https://github.com/royvillasana/inkwell">View the source</a>
+      <a class="btn btn-line" href="https://github.com/royvillasana/inkju">View the source</a>
     </div>
     <p class="hero-note">macOS 11 or later · Apple Silicon · MIT licensed</p>
 
@@ -612,11 +612,11 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 9v5"/><path d="M12 17.5v.01"/><path d="M10.3 3.9 2.4 17.4A2 2 0 0 0 4.1 20.4h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
       <p>
         <b>First launch.</b> This build is not signed with an Apple Developer ID, so macOS shows
-        an "unidentified developer" warning. Drag Inkwell to Applications, then <b>right-click the
+        an "unidentified developer" warning. Drag Inkju to Applications, then <b>right-click the
         app and choose Open</b>, and Open again in the dialog. Once is enough. If you prefer the
         terminal:
-        <code>xattr -dr com.apple.quarantine /Applications/Inkwell.app</code>
-        <span class="sha">SHA-256 75ca92fcac33df37fa850c3b26d85efd9dc9ec7398dcbec40321914b98adbe90</span>
+        <code>xattr -dr com.apple.quarantine /Applications/Inkju.app</code>
+        <span class="sha">SHA-256 f4c9b2904f16b141d3eff006f291c2cb99468534cbdf75cbda9817bc38c6d3f8</span>
       </p>
     </div>
   </div>
@@ -624,12 +624,12 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 
 <footer>
   <div class="wrap foot">
-    <a class="name" href="#top"><img src="assets/logo-feather.png" srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x" alt="" width="313" height="256"> Inkwell</a>
+    <a class="name" href="#top"><img src="assets/logo-feather.png" srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x" alt="" width="313" height="256"> Inkju</a>
     <span>MIT licensed</span>
     <span class="right">
-      <a href="https://github.com/royvillasana/inkwell">GitHub</a>
-      <a href="https://github.com/royvillasana/inkwell/releases">Releases</a>
-      <a href="https://github.com/royvillasana/inkwell/issues">Report a problem</a>
+      <a href="https://github.com/royvillasana/inkju">GitHub</a>
+      <a href="https://github.com/royvillasana/inkju/releases">Releases</a>
+      <a href="https://github.com/royvillasana/inkju/issues">Report a problem</a>
       <a href="try.html">Try in browser</a>
     </span>
   </div>
@@ -671,7 +671,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
     var narrow = window.innerWidth < EDITOR_NARROW;
     var frame = document.createElement("iframe");
     frame.src = "try.html#theme=night";   /* match the page it sits in */
-    frame.title = "Inkwell running live";
+    frame.title = "Inkju running live";
     frame.setAttribute("loading", "lazy");
     frame.addEventListener("load", function () {
       var shot = body.querySelector(".appwin-shot");

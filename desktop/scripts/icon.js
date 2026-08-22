@@ -47,7 +47,7 @@ app.whenReady().then(async () => {
     width: SIZE, height: SIZE, show: false, frame: false, transparent: true,
     backgroundColor: "#00000000", webPreferences: { sandbox: true, offscreen: false }
   });
-  const tmp = path.join(os.tmpdir(), "inkwell-icon-" + Date.now() + ".html");
+  const tmp = path.join(os.tmpdir(), "inkju-icon-" + Date.now() + ".html");
   fs.writeFileSync(tmp, MARK, "utf8");
   await win.loadFile(tmp);
   await new Promise(r => setTimeout(r, 500));

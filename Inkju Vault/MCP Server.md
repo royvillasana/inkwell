@@ -1,6 +1,6 @@
 ---
 title: MCP Server
-tags: [inkwell, mcp, agents]
+tags: [inkju, mcp, agents]
 ---
 
 # MCP Server
@@ -12,12 +12,12 @@ Back to [[Index]]. Shipped in the unreleased work listed in [[Updates]].
 ## Adding it
 
 ```bash
-claude mcp add inkwell --scope user -- node /path/to/desktop/src/mcp/server.mjs
+claude mcp add inkju --scope user -- node /path/to/desktop/src/mcp/server.mjs
 ```
 
-With no `--vault` argument it serves whichever vault Inkwell currently has
+With no `--vault` argument it serves whichever vault Inkju currently has
 open, read from the app's own `settings.json`, so the agent and the window you
-are looking at never disagree. Pass `--vault <folder>` or set `INKWELL_VAULT`
+are looking at never disagree. Pass `--vault <folder>` or set `INKJU_VAULT`
 to point it somewhere else. It refuses to start if neither resolves to a real
 folder.
 
@@ -41,7 +41,7 @@ index the sidebar searches.
 - **Nothing is deleted.** `trash_note` moves a note into `.trash` inside the
   vault.
 - **Nothing is one way.** Every edit snapshots the previous version first, so an
-  agent's changes appear in Inkwell's version history exactly like your own.
+  agent's changes appear in Inkju's version history exactly like your own.
 
 The app picks agent edits up through the same file watcher it uses for any
 other external change, so notes refresh while you watch.

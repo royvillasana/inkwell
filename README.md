@@ -1,6 +1,6 @@
-# Inkwell
+# Inkju
 
-**[Download for Mac](https://github.com/royvillasana/inkwell/releases/latest) · [Try it in your browser](https://royvillasana.github.io/inkwell/try.html) · [Website](https://royvillasana.github.io/inkwell/)**
+**[Download for Mac](https://github.com/royvillasana/inkju/releases/latest) · [Try it in your browser](https://royvillasana.github.io/inkju/try.html) · [Website](https://royvillasana.github.io/inkju/)**
 
 A markdown editor in the spirit of Typora: the block under your caret shows its
 markdown source, everything else shows finished, rendered prose.
@@ -10,7 +10,7 @@ the same editing model — they differ in what the surrounding application can d
 
 | | **Light** | **Desktop** |
 | --- | --- | --- |
-| File | `Inkwell.html` | `desktop/` |
+| File | `Inkju.html` | `desktop/` |
 | Size | one 156 KB file | Electron app, 115 MB download |
 | Install | none — double-click it | `npm install && npm start` |
 | Dependencies | zero | Electron only |
@@ -46,7 +46,7 @@ from a network.
 ## Light build
 
 ```bash
-open Inkwell.html
+open Inkju.html
 ```
 
 That is the whole story. It runs from `file://`, needs no server, and keeps a
@@ -60,9 +60,9 @@ Use it when you want to hand someone an editor as a single attachment.
 
 ## Desktop build
 
-Prebuilt: **[Inkwell-2.1.9-arm64.dmg](https://github.com/royvillasana/inkwell/releases/latest)**
+Prebuilt: **[Inkju-2.2.0-arm64.dmg](https://github.com/royvillasana/inkju/releases/latest)**
 (macOS, Apple Silicon). The build is unsigned, so on first launch right-click the
-app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkwell.app`.
+app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Inkju.app`.
 
 From source:
 
@@ -101,15 +101,15 @@ downloads: `npm approve-scripts electron`.
   a file changes underneath unsaved edits.
 - **Images** are written into an `assets/` folder next to the note and linked
   relatively, instead of being inlined as base64.
-- **Version history** on disk in `.inkwell/history`, one snapshot per save and
+- **Version history** on disk in `.inkju/history`, one snapshot per save and
   one every five minutes while writing.
 - **Native menus**, recent files, multiple windows, session restore, file
   associations for `.md`, and PDF export rendered by the app rather than a
   browser print dialog.
-- **Updates that install themselves.** Inkwell asks GitHub's releases API
+- **Updates that install themselves.** Inkju asks GitHub's releases API
   whether a newer version exists and shows a card in the bottom left if so.
   Its button downloads the disk image, checks it against the SHA-256 GitHub
-  publishes, confirms the bundle inside really is a newer Inkwell with an
+  publishes, confirms the bundle inside really is a newer Inkju with an
   intact signature, replaces the installed app and relaunches. No dragging.
   Dismissing the card leaves *Update to X* in the status bar for the rest of
   the session. This is the only network request the app makes, it carries no
@@ -118,7 +118,7 @@ downloads: `npm approve-scripts electron`.
   Nothing is patched inside the installed bundle — a macOS signature seals
   every file it contains, which is what makes an edited app "damaged". The
   bundle is replaced whole, by two renames on one volume, and a failure puts
-  the old app back. If Inkwell cannot write to where it is installed, it falls
+  the old app back. If Inkju cannot write to where it is installed, it falls
   back to handing you the disk image.
 
 ### Letting an agent work in your vault
@@ -127,7 +127,7 @@ downloads: `npm approve-scripts electron`.
 that gives Claude Code — or any MCP client — vault-aware access to your notes:
 
 ```bash
-claude mcp add inkwell --scope user -- node /path/to/desktop/src/mcp/server.mjs
+claude mcp add inkju --scope user -- node /path/to/desktop/src/mcp/server.mjs
 ```
 
 That path is a **source checkout** with `npm install` run in `desktop/` — the
@@ -135,10 +135,10 @@ server needs the MCP SDK from `node_modules`. The copy inside the packaged
 `.app` cannot run on its own: the SDK is a build-time dependency and is not
 shipped in the bundle.
 
-With no `--vault` argument it serves whichever vault Inkwell currently has
+With no `--vault` argument it serves whichever vault Inkju currently has
 open, and keeps doing so: it re-reads the app's choice on every call, so
 switching vaults in the window moves the agent too. Pass `--vault <folder>` or
-set `INKWELL_VAULT` to pin it somewhere instead, for the life of the process.
+set `INKJU_VAULT` to pin it somewhere instead, for the life of the process.
 
 An agent could already edit these files with ordinary filesystem tools — they
 are plain markdown. What this adds is the vault: full-text search, backlinks,
@@ -158,7 +158,7 @@ Three rules it will not break:
 - **Nothing is deleted.** `trash_note` moves a note to `.trash` inside the
   vault.
 - **Nothing is one-way.** Every edit snapshots the previous version first, so
-  an agent's changes appear in Inkwell's version history like your own.
+  an agent's changes appear in Inkju's version history like your own.
 
 The app picks agent edits up through the same file watcher it uses for any
 other external change, so notes refresh while you watch.
@@ -331,14 +331,14 @@ cd desktop
 npm run vendor              # refresh src/renderer/vendor from node_modules
 npx electron scripts/icon.js  # regenerate build/icon.icns
 npm run test:all
-npm run dist:mac            # dist/Inkwell-<version>-arm64.dmg
+npm run dist:mac            # dist/Inkju-<version>-arm64.dmg
 gh release create v<version> desktop/dist/*.dmg
 ```
 
 The landing page lives in `docs/` and is served by GitHub Pages from `main`.
-`docs/try.html` is a copy of `Inkwell.html`, so refresh it when the light build
+`docs/try.html` is a copy of `Inkju.html`, so refresh it when the light build
 changes:
 
 ```bash
-cp Inkwell.html docs/try.html
+cp Inkju.html docs/try.html
 ```

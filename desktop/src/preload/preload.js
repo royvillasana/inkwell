@@ -18,7 +18,7 @@ const listen = (channel, fn) => {
   return () => ipcRenderer.removeListener(channel, wrapped);
 };
 
-contextBridge.exposeInMainWorld("inkwell", {
+contextBridge.exposeInMainWorld("inkju", {
   platform: process.platform,
   isDesktop: true,
   /* webUtils is the only way to learn a dropped file's path since Electron 32,

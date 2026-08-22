@@ -6,7 +6,7 @@
  * consistent*: the Electron binary arrives linker-signed, and once
  * electron-builder renames it and injects app resources that signature no
  * longer seals what is on disk. macOS reports that mismatch to the user as
- * "Inkwell is damaged and can't be opened", and right-click → Open does not
+ * "Inkju is damaged and can't be opened", and right-click → Open does not
  * help — Gatekeeper never gets that far.
  *
  * Re-signing ad-hoc (`--sign -`) makes the bundle consistent again. The app

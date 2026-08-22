@@ -1,9 +1,9 @@
 /* ===========================================================================
-   Inkwell — base styles, themes and rendered-markdown typography.
+   Inkju — base styles, themes and rendered-markdown typography.
    Shared with the single-file build; window chrome lives in desktop.css.
    =========================================================================== */
 /* ============================================================
-   Inkwell — single-file markdown editor
+   Inkju — single-file markdown editor
    Themes are pure CSS variables; everything else inherits.
    ============================================================ */
 :root{

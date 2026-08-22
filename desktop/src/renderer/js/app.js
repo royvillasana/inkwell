@@ -1,6 +1,6 @@
 /* ===========================================================================
    Application shell: documents and tabs, disk I/O, views, commands, boot.
-   Everything that touches the filesystem goes through window.inkwell.
+   Everything that touches the filesystem goes through window.inkju.
    =========================================================================== */
 import {
   renderDoc, renderBlock, esc, mdOptions, setHeadingSource, blockType, splitBlocks
@@ -18,7 +18,7 @@ import * as Rich from "./rich.js";
 import * as Convert from "./convert.js";
 import * as Rich9 from "./rich-editor.js";
 
-const api = window.inkwell;
+const api = window.inkju;
 const IS_MAC = api.platform === "darwin";
 
 /* ---------------------------------------------------------------- helpers */
@@ -585,7 +585,7 @@ setInterval(() => { if (state.dirty) api.history.save(state.name, serialize()).c
 
 async function historyDialog(){
   const list = await api.history.list(state.name).catch(() => []);
-  if (!list.length) return say("No snapshots for this note yet. Inkwell keeps one every five minutes while you write, and one on every save.", "Version history");
+  if (!list.length) return say("No snapshots for this note yet. Inkju keeps one every five minutes while you write, and one on every save.", "Version history");
   const pick = await dialog({
     title: "Version history — " + state.name,
     wide: true,
@@ -692,7 +692,7 @@ async function pandocHelp(){
   const r = await dialog({
     title: "Pandoc is not installed",
     message: "Word (.docx), LaTeX, EPUB, RTF, reStructuredText and the rest are produced by Pandoc, a free converter. " +
-             "Install it and Inkwell will pick it up automatically:\n\n    " + how +
+             "Install it and Inkju will pick it up automatically:\n\n    " + how +
              "\n\nThe HTML, PDF, .doc and plain text exports work without it.",
     buttons: [
       { label: "Close", value: null },
@@ -806,7 +806,7 @@ async function settingsDialog(){
       { name: "lineNumbers", label: "Line numbers in code blocks", type: "checkbox", value: prefs.lineNumbers },
       { name: "spellcheck", label: "Check spelling while writing", type: "checkbox", value: prefs.spellcheck },
       { name: "checkUpdates", label: "Check GitHub for new versions", type: "checkbox", value: prefs.checkUpdates,
-        hint: "The only network request Inkwell makes. Nothing about you or your notes is sent." }
+        hint: "The only network request Inkju makes. Nothing about you or your notes is sent." }
     ],
     buttons: [{ label: "Cancel", value: "cancel" }, { label: "Apply", value: "ok", primary: true }]
   });
@@ -1224,7 +1224,7 @@ function mountTips(){
 }
 
 /* ---- updates --------------------------------------------------------------
-   Inkwell makes exactly one network request, and this is it: GitHub's releases
+   Inkju makes exactly one network request, and this is it: GitHub's releases
    API, no identifiers attached, off entirely if you would rather. Applying the
    update in place needs a Developer ID signature, which these builds do not
    have, so the CTA downloads the disk image and opens it for you. */
@@ -1234,9 +1234,9 @@ let updateBusy = false;
 function showUpdate(info){
   pendingUpdate = info;
   $("#st-update").hidden = true;
-  $("#up-title").textContent = "Inkwell " + info.latest + " is out";
+  $("#up-title").textContent = "Inkju " + info.latest + " is out";
   $("#up-body").textContent = "You are on " + info.current +
-    (info.asset ? ". Download it and Inkwell will open the installer for you." : ". Open the release page to get it.");
+    (info.asset ? ". Download it and Inkju will open the installer for you." : ". Open the release page to get it.");
   $("#up-go").textContent = info.asset ? "Update" : "Open release";
   $("#up-go").disabled = false;
   $("#up-bar").hidden = true;
@@ -1294,10 +1294,10 @@ async function runUpdate(){
     const res = await api.updates.install(file.path);
     if (res && res.mode === "inplace") {
       /* main quits a moment later; the swap happens while we are gone */
-      $("#up-body").textContent = "Inkwell " + res.version + " is installed. Restarting…";
+      $("#up-body").textContent = "Inkju " + res.version + " is installed. Restarting…";
       go.textContent = "Restarting";
     } else {
-      $("#up-body").textContent = "Drag Inkwell to Applications to finish, then reopen it.";
+      $("#up-body").textContent = "Drag Inkju to Applications to finish, then reopen it.";
       go.textContent = "Done";
     }
   } catch (err) {
@@ -1566,7 +1566,7 @@ async function followWiki(page){
 }
 
 const WELCOME = [
-  "# Inkwell",
+  "# Inkju",
   "",
   "A quiet markdown editor. This is the desktop build: it reads and writes real files,",
   "keeps a whole folder of notes in view, and searches across all of them.",
@@ -1598,6 +1598,6 @@ const WELCOME = [
 
 boot().catch(err => {
   console.error(err);
-  document.body.innerHTML = '<pre style="padding:40px;font:13px/1.6 monospace;color:#c0392b">Inkwell failed to start:\n\n' +
+  document.body.innerHTML = '<pre style="padding:40px;font:13px/1.6 monospace;color:#c0392b">Inkju failed to start:\n\n' +
     esc(err.stack || err.message) + "</pre>";
 });

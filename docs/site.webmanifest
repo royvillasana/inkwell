@@ -1,6 +1,6 @@
 {
-  "name": "Inkwell",
-  "short_name": "Inkwell",
+  "name": "Inkju",
+  "short_name": "Inkju",
   "description": "A markdown editor that shows the source only for the block you are editing.",
   "start_url": "./",
   "display": "standalone",

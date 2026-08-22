@@ -1,9 +1,9 @@
 ---
-title: Inkwell
-tags: [inkwell]
+title: Inkju
+tags: [inkju]
 ---
 
-# Inkwell
+# Inkju
 
 A quiet markdown editor for the desktop, in the spirit of Typora: the block
 under your caret shows its markdown source, everything else shows finished,
@@ -24,11 +24,11 @@ read its own manual.
 | | |
 | --- | --- |
 | Version | 2.1.2 |
-| Builds | `Inkwell.html` (light) and `desktop/` (Electron) |
+| Builds | `Inkju.html` (light) and `desktop/` (Electron) |
 | Licence | MIT |
 | Author | Roy Villasana |
-| Site | https://royvillasana.github.io/inkwell/ |
-| Releases | https://github.com/royvillasana/inkwell/releases/latest |
+| Site | https://royvillasana.github.io/inkju/ |
+| Releases | https://github.com/royvillasana/inkju/releases/latest |
 
 ## The shape of it
 
@@ -41,4 +41,4 @@ Neither build fetches anything from a network while you write. The desktop
 build makes exactly one request, ever: an update check against GitHub's
 releases API, which carries no identifiers and can be switched off.
 
-#inkwell #docs
+#inkju #docs

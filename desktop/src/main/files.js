@@ -7,7 +7,7 @@ const path = require("path");
 
 const MD = /\.(md|markdown|mdown|mkd|txt)$/i;
 const IMG = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
-const SKIP_DIRS = new Set(["node_modules", ".git", ".obsidian", ".trash", "dist", "build", ".inkwell"]);
+const SKIP_DIRS = new Set(["node_modules", ".git", ".obsidian", ".trash", "dist", "build", ".inkju", ".inkwell"]);
 
 const isMarkdown = p => MD.test(p);
 const isImage = p => IMG.test(p);
@@ -117,8 +117,13 @@ async function saveImage(noteFile, folderName, data, ext){
   };
 }
 
-/* On-disk snapshots, kept beside the vault in .inkwell/history */
-function historyDir(root){ return path.join(root, ".inkwell", "history"); }
+/* On-disk snapshots, kept beside the vault in .inkju/history. Vaults written
+   by earlier versions used .inkju, and those snapshots are still someone's
+   history, so they are read as well as the new location — renaming the app must
+   not make a vault's past disappear. */
+const LEGACY_DIR = ".inkwell";
+function historyDir(root){ return path.join(root, ".inkju", "history"); }
+function legacyHistoryDir(root){ return path.join(root, LEGACY_DIR, "history"); }
 
 async function writeSnapshot(root, noteName, text){
   const dir = historyDir(root);
@@ -134,22 +139,23 @@ async function writeSnapshot(root, noteName, text){
 }
 
 async function listSnapshots(root, noteName){
-  const dir = historyDir(root);
-  let names;
-  try { names = await fsp.readdir(dir); } catch (err) { return []; }
   const safe = noteName ? noteName.replace(/[^\w.-]+/g, "_") : null;
-  return names
-    .filter(f => f.endsWith(".snapshot") && (!safe || f.startsWith(safe + ".")))
-    .map(f => {
+  const out = [];
+  for (const dir of [historyDir(root), legacyHistoryDir(root)]) {
+    let names;
+    try { names = await fsp.readdir(dir); } catch (err) { continue; }
+    for (const f of names) {
+      if (!f.endsWith(".snapshot")) continue;
+      if (safe && !f.startsWith(safe + ".")) continue;
       const parts = f.split(".");
-      return { file: path.join(dir, f), at: Number(parts[parts.length - 2]) || 0, name: parts.slice(0, -2).join(".") };
-    })
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 80);
+      out.push({ file: path.join(dir, f), at: Number(parts[parts.length - 2]) || 0, name: parts.slice(0, -2).join(".") });
+    }
+  }
+  return out.sort((a, b) => b.at - a.at).slice(0, 80);
 }
 
 module.exports = {
   isMarkdown, isImage, within, readText, writeText, listTree, flatten,
   createFile, renameFile, saveImage, uniquePath,
-  writeSnapshot, listSnapshots, historyDir, SKIP_DIRS
+  writeSnapshot, listSnapshots, historyDir, legacyHistoryDir, SKIP_DIRS
 };

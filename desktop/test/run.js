@@ -17,7 +17,7 @@ async function test(name, fn){
 }
 
 (async () => {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "inkwell-test-"));
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "inkju-test-"));
   const write = (rel, body) => {
     const full = path.join(root, rel);
     fs.mkdirSync(path.dirname(full), { recursive: true });
@@ -216,11 +216,11 @@ async function test(name, fn){
     const pickAsset = new Function("process", pickBody + "; return pickAsset;")(
       { platform: "darwin", arch: "arm64", env: {} });
     const assets = [
-      { name: "Inkwell-2.1.3-x64.dmg" },
-      { name: "Inkwell-2.1.3-arm64.dmg" },
-      { name: "Inkwell-2.1.3.zip" }
+      { name: "Inkju-2.1.3-x64.dmg" },
+      { name: "Inkju-2.1.3-arm64.dmg" },
+      { name: "Inkju-2.1.3.zip" }
     ];
-    assert.strictEqual(pickAsset(assets).name, "Inkwell-2.1.3-arm64.dmg");
+    assert.strictEqual(pickAsset(assets).name, "Inkju-2.1.3-arm64.dmg");
     assert.strictEqual(pickAsset([]), null, "no assets must not throw");
   });
 
@@ -305,16 +305,16 @@ async function test(name, fn){
 
   await test("the landing page's try.html matches the light build", () => {
     const root = path.join(__dirname, "..", "..");
-    const light = fs.readFileSync(path.join(root, "Inkwell.html"), "utf8");
+    const light = fs.readFileSync(path.join(root, "Inkju.html"), "utf8");
     const served = fs.readFileSync(path.join(root, "docs", "try.html"), "utf8");
     assert.strictEqual(served, light,
-      "docs/try.html has drifted from Inkwell.html — copy it across after editing the light build");
+      "docs/try.html has drifted from Inkju.html — copy it across after editing the light build");
   });
 
   await test("the status bar sheds items rather than wrapping", () => {
     const root = path.join(__dirname, "..", "..");
     for (const [name, file] of [
-      ["light build", path.join(root, "Inkwell.html")],
+      ["light build", path.join(root, "Inkju.html")],
       ["desktop", path.join(__dirname, "..", "src", "renderer", "css", "app.css")]
     ]) {
       const css = fs.readFileSync(file, "utf8");
@@ -333,8 +333,8 @@ async function test(name, fn){
   const { execFileSync } = require("child_process");
 
   const stage = async () => {
-    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "inkwell-swap-"));
-    const appPath = path.join(dir, "Inkwell.app");
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "inkju-swap-"));
+    const appPath = path.join(dir, "Inkju.app");
     const staged = path.join(dir, ".staged.app");
     await fsp.mkdir(path.join(appPath, "Contents"), { recursive: true });
     await fsp.writeFile(path.join(appPath, "Contents", "which"), "old");
@@ -403,10 +403,10 @@ async function test(name, fn){
 
   await test("paths with quotes and spaces survive the script", () => {
     const text = swapScript({
-      appPath: "/Apps/Roy's Inkwell.app", staged: "/Apps/.staged.app",
+      appPath: "/Apps/Roy's Inkju.app", staged: "/Apps/.staged.app",
       backup: "/Apps/.b.app", pid: 42, logFile: "/tmp/u.log"
     });
-    assert.ok(text.includes("'/Apps/Roy'\\''s Inkwell.app'"), "quote not escaped:\n" + text);
+    assert.ok(text.includes("'/Apps/Roy'\\''s Inkju.app'"), "quote not escaped:\n" + text);
     assert.ok(text.includes("kill -0 42"), "pid missing");
     assert.ok(/open '\/Apps\/Roy/.test(text), "launcher defaults to open");
   });

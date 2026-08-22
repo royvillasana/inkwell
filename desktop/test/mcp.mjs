@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = process.argv[2] || path.join(here, "..", "src", "mcp", "server.mjs");
-const VAULT = process.argv[3] || fs.mkdtempSync(path.join(os.tmpdir(), "inkwell-mcp-"));
+const VAULT = process.argv[3] || fs.mkdtempSync(path.join(os.tmpdir(), "inkju-mcp-"));
 
 /* a small vault to work against, rebuilt every run */
 fs.mkdirSync(path.join(VAULT, "notes"), { recursive: true });
@@ -60,7 +60,7 @@ try {
   const init = await rpc("initialize", {
     protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1" }
   });
-  check("handshake", init.serverInfo.name === "inkwell", JSON.stringify(init.serverInfo));
+  check("handshake", init.serverInfo.name === "inkju", JSON.stringify(init.serverInfo));
   child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
 
   const tools = (await rpc("tools/list", {})).tools;
@@ -119,7 +119,7 @@ try {
         && fs.readdirSync(VAULT + "/.trash").length === 1, "trash: " + fs.readdirSync(VAULT + "/.trash"));
 
   /* history: an agent edit must be recoverable */
-  const snaps = fs.existsSync(VAULT + "/.inkwell/history") ? fs.readdirSync(VAULT + "/.inkwell/history") : [];
+  const snaps = fs.existsSync(VAULT + "/.inkju/history") ? fs.readdirSync(VAULT + "/.inkju/history") : [];
   check("agent edits leave a snapshot behind", snaps.length > 0, "snapshots: " + snaps.length);
 
   /* the vault boundary must hold */
@@ -127,7 +127,7 @@ try {
   try { await call("read_note", { note: "../../../etc/passwd" }); escaped = "read succeeded"; }
   catch (e) { escaped = null; }
   check("refuses to read outside the vault", escaped === null, escaped);
-  try { await call("write_note", { note: "/etc/inkwell-test", content: "x" }); escaped = "write succeeded"; }
+  try { await call("write_note", { note: "/etc/inkju-test", content: "x" }); escaped = "write succeeded"; }
   catch (e) { escaped = null; }
   check("refuses to write outside the vault", escaped === null, escaped);
 } catch (err) {
@@ -142,21 +142,21 @@ child.kill();
    server with it: resolving once at startup meant an agent kept working in the
    old vault while the window showed a different one. */
 try {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "inkwell-home-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "inkju-home-"));
   const settingsDir = process.platform === "darwin"
-    ? path.join(home, "Library", "Application Support", "Inkwell")
-    : path.join(home, ".config", "Inkwell");
+    ? path.join(home, "Library", "Application Support", "Inkju")
+    : path.join(home, ".config", "Inkju");
   fs.mkdirSync(settingsDir, { recursive: true });
   const settings = path.join(settingsDir, "settings.json");
 
-  const A = fs.mkdtempSync(path.join(os.tmpdir(), "inkwell-vault-a-"));
-  const B = fs.mkdtempSync(path.join(os.tmpdir(), "inkwell-vault-b-"));
+  const A = fs.mkdtempSync(path.join(os.tmpdir(), "inkju-vault-a-"));
+  const B = fs.mkdtempSync(path.join(os.tmpdir(), "inkju-vault-b-"));
   fs.writeFileSync(path.join(A, "OnlyInA.md"), "# Only in A\n");
   fs.writeFileSync(path.join(B, "OnlyInB.md"), "# Only in B\n");
   fs.writeFileSync(settings, JSON.stringify({ vault: A }));
 
   const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config") };
-  delete env.INKWELL_VAULT;
+  delete env.INKJU_VAULT;
   const kid = spawn("node", [SERVER], { stdio: ["pipe", "pipe", "pipe"], env });
   let kbuf = "";
   const kpending = new Map();

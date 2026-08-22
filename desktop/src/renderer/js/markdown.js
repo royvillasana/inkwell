@@ -1,6 +1,6 @@
 /* ===========================================================================
    Markdown engine — pure functions, no DOM, no app state.
-   Shared verbatim with the single-file build of Inkwell.
+   Shared verbatim with the single-file build of Inkju.
    =========================================================================== */
 export const mdOptions = {
   lineNumbers: false,

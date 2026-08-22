@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inkwell — a quiet markdown editor</title>
+<title>Inkju — a quiet markdown editor</title>
 <style>
 /* ============================================================
-   Inkwell — single-file markdown editor
+   Inkju — single-file markdown editor
    Themes are pure CSS variables; everything else inherits.
    ============================================================ */
 :root{
@@ -364,7 +364,7 @@ body.mode-source #source{display:block}
 <div id="app">
   <aside id="sidebar">
     <div class="side-head">
-      <div class="brand"><span class="dot"></span> Inkwell <small>md</small></div>
+      <div class="brand"><span class="dot"></span> Inkju <small>md</small></div>
     </div>
     <div class="side-tabs">
       <button data-pane="files" class="on">Files</button>
@@ -1288,7 +1288,16 @@ function renderTOC(){
    =========================================================================== */
 const LS = {
   ok: true,
-  get(k){ try { return localStorage.getItem(k); } catch (e) { LS.ok = false; return null; } },
+  /* Saved work lives under inkju:*. Anything written before the app was renamed
+     is under inkwell:*, so a missing new key falls back to the old one and a
+     returning visitor keeps their draft instead of meeting a blank page. */
+  get(k){
+    try {
+      const v = localStorage.getItem(k);
+      if (v != null) return v;
+      return k.indexOf("inkju:") === 0 ? localStorage.getItem("inkwell:" + k.slice(6)) : null;
+    } catch (e) { LS.ok = false; return null; }
+  },
   set(k, v){ try { localStorage.setItem(k, v); return true; } catch (e) { LS.ok = false; return false; } }
 };
 const $  = s => document.querySelector(s);
@@ -1752,7 +1761,7 @@ function touch(dirty){
 }
 
 function persist(){
-  const ok = LS.set("inkwell:doc", serialize()) && LS.set("inkwell:name", state.name) && LS.set("inkwell:prefs", JSON.stringify(prefs));
+  const ok = LS.set("inkju:doc", serialize()) && LS.set("inkju:name", state.name) && LS.set("inkju:prefs", JSON.stringify(prefs));
   $("#st-saved").textContent = ok
     ? "draft saved " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "local drafts unavailable";
@@ -2072,7 +2081,7 @@ function touchSource(){
   $("#st-lines").textContent = t.split("\n").length.toLocaleString();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    LS.set("inkwell:doc", $("#source").value);
+    LS.set("inkju:doc", $("#source").value);
   }, 600);
 }
 
@@ -2305,7 +2314,7 @@ window.addEventListener("beforeunload", e => {
 
 /* ---- boot --------------------------------------------------------------- */
 const WELCOME = [
-  "# Inkwell",
+  "# Inkju",
   "",
   "A quiet markdown editor that lives in a single HTML file. No server, no build step, no",
   "network requests. Mail this file to someone and it works on their machine too.",
@@ -2373,7 +2382,7 @@ const WELCOME = [
   "snapshot every five minutes and on every save, so you can walk backwards. Set a **word goal**",
   "in preferences and a small ring tracks it in the status bar.",
   "",
-  "Open a folder in the sidebar to browse your notes, and `[[link them together]]` — Inkwell will",
+  "Open a folder in the sidebar to browse your notes, and `[[link them together]]` — Inkju will",
   "offer to create a page that does not exist yet, and can scan the folder for what links back.",
   "",
   "Export to HTML, PDF, Word, plain text or raw markdown. `⌘S` writes straight back to the",
@@ -2387,7 +2396,7 @@ const WELCOME = [
 
 (function boot(){
  try {
-  try { Object.assign(prefs, JSON.parse(LS.get("inkwell:prefs") || "{}")); } catch (err) {}
+  try { Object.assign(prefs, JSON.parse(LS.get("inkju:prefs") || "{}")); } catch (err) {}
   setTheme(prefs.theme || "paper");
 
   /* #theme=night lets a page that embeds this file match its own colours,
@@ -2404,8 +2413,8 @@ const WELCOME = [
   if (prefs.wide)       { prefs.wide = false; toggleWide(); }
   prefs.source = false;
 
-  const doc = LS.get("inkwell:doc");
-  const name = LS.get("inkwell:name");
+  const doc = LS.get("inkju:doc");
+  const name = LS.get("inkju:name");
   loadText(doc && doc.trim() ? doc : WELCOME, name || "Welcome.md");
   state.dirty = false;
   touch(false);
@@ -2414,7 +2423,7 @@ const WELCOME = [
     ? '<div class="side-empty">No folder open yet.</div>'
     : '<div class="side-empty">This browser cannot browse folders. Open single files instead — saving will download a copy.</div>';
  } catch (err) {
-   console.error("Inkwell boot:", err);
+   console.error("Inkju boot:", err);
    loadText(WELCOME, "Welcome.md");
    touch(false);
  }
@@ -2638,7 +2647,7 @@ modal.root.addEventListener("keydown", e => {
 
 /* --- the three replacements for the browser primitives ------------------- */
 const say = (message, title) => dialog({
-  title: title || "Inkwell", message,
+  title: title || "Inkju", message,
   buttons: [{ label: "OK", value: true, primary: true }]
 });
 
@@ -2651,7 +2660,7 @@ const ask = (message, opt = {}) => dialog({
 }).then(v => v === true);
 
 const askText = (message, value, opt = {}) => dialog({
-  title: opt.title || "Inkwell", message,
+  title: opt.title || "Inkju", message,
   fields: [{ name: "value", label: opt.label || "", value: value || "", placeholder: opt.placeholder }],
   buttons: [{ label: "Cancel", value: "cancel" }, { label: opt.ok || "OK", value: "ok", primary: true }]
 }).then(r => (r && r.action === "ok" ? r.value : null));
@@ -3475,7 +3484,7 @@ function presentKeys(e){
 }
 
 /* ---- version history ---------------------------------------------------- */
-const HIST_KEY = "inkwell:history", HIST_MAX = 40;
+const HIST_KEY = "inkju:history", HIST_MAX = 40;
 function readHistory(){
   try { return JSON.parse(LS.get(HIST_KEY) || "[]"); } catch (e) { return []; }
 }
@@ -3494,7 +3503,7 @@ setInterval(() => { if (state.dirty) snapshotHistory("auto"); }, 5 * 60 * 1000);
 
 async function historyDialog(){
   const all = readHistory();
-  if (!all.length) return say("No snapshots yet. Inkwell keeps one every five minutes while you write, and one each time you save.", "Version history");
+  if (!all.length) return say("No snapshots yet. Inkju keeps one every five minutes while you write, and one each time you save.", "Version history");
   const fmt = t => {
     const d = new Date(t), now = new Date();
     const sameDay = d.toDateString() === now.toDateString();
@@ -3613,7 +3622,7 @@ $("#btn-hist").onclick    = () => historyDialog();
 $("#split-src").addEventListener("input", () => {
   state.dirty = true;
   clearTimeout(splitTimer);
-  splitTimer = setTimeout(() => { paintSplit(); LS.set("inkwell:doc", $("#split-src").value); }, 220);
+  splitTimer = setTimeout(() => { paintSplit(); LS.set("inkju:doc", $("#split-src").value); }, 220);
 });
 
 function cycleTab(d){

@@ -1,11 +1,11 @@
 /* ===========================================================================
    The sidebar: file tree, outline, vault-wide search, tags and backlinks.
-   Everything here talks to disk through window.inkwell, never directly.
+   Everything here talks to disk through window.inkju, never directly.
    =========================================================================== */
 import { $, $$ } from "./editor.js";
 import { dialog, say, askText } from "./dialogs.js";
 
-const api = window.inkwell;
+const api = window.inkju;
 
 export const vault = { root: null, tree: [], collapsed: new Set(), stats: null };
 let openFile = () => {};
@@ -227,7 +227,7 @@ async function closeVault(){
   const name = vaultName();
   const yes = await dialog({
     title: "Close this vault?",
-    message: "Inkwell will stop showing \u201c" + name + "\u201d in the sidebar. Nothing is deleted, and any tabs you have open stay open.",
+    message: "Inkju will stop showing \u201c" + name + "\u201d in the sidebar. Nothing is deleted, and any tabs you have open stay open.",
     buttons: [{ label: "Cancel", value: false }, { label: "Close vault", value: true }]
   });
   if (!yes) return;

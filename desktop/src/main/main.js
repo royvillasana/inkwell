@@ -10,9 +10,33 @@ const os = require("os");
    after the require, smoke runs were still reading and writing the real
    profile — rewriting saved preferences and leaving scratch documents in the
    restored session. */
-if (process.env.INKWELL_SMOKE) {
-  app.setPath("userData", path.join(os.tmpdir(), "inkwell-smoke-" + process.pid));
+if (process.env.INKJU_SMOKE) {
+  app.setPath("userData", path.join(os.tmpdir(), "inkju-smoke-" + process.pid));
 }
+
+/* The app used to be called Inkwell, and Electron derives the settings folder
+   from the app's name — so renaming it moves the folder and a returning user
+   would be met by a first-run app: no vault, no session, no preferences. Carry
+   the old profile across once, before store resolves its path at load. The old
+   folder is left where it is rather than moved, so an older build still runs. */
+(function adoptOldProfile(){
+  if (process.env.INKJU_SMOKE) return;
+  try {
+    const here = app.getPath("userData");
+    if (fs.existsSync(path.join(here, "settings.json"))) return;   // already ours
+    const before = path.join(path.dirname(here), "Inkwell");
+    if (!fs.existsSync(path.join(before, "settings.json"))) return;
+    fs.mkdirSync(here, { recursive: true });
+    for (const name of fs.readdirSync(before)) {
+      if (name.startsWith(".")) continue;
+      const from = path.join(before, name), to = path.join(here, name);
+      if (fs.statSync(from).isFile() && !fs.existsSync(to)) fs.copyFileSync(from, to);
+    }
+    console.log("carried the Inkwell profile over to Inkju");
+  } catch (err) {
+    console.warn("could not carry the old profile over:", err.message);
+  }
+})();
 
 const store = require("./store");
 const files = require("./files");
@@ -38,7 +62,7 @@ function createWindow(openPath){
     minWidth: 620,
     minHeight: 440,
     show: false,
-    title: "Inkwell",
+    title: "Inkju",
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#16171a" : "#f7f6f3",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition: { x: 14, y: 15 },
@@ -77,8 +101,8 @@ function createWindow(openPath){
   win.webContents.on("did-finish-load", () => {
     const queue = openPath ? [openPath] : pendingOpen.splice(0);
     if (queue.length) win.webContents.send("open-paths", queue);
-    if (process.env.INKWELL_SMOKE) runSmoke(win);
-    if (process.env.INKWELL_SHOT) captureShot(win);
+    if (process.env.INKJU_SMOKE) runSmoke(win);
+    if (process.env.INKJU_SHOT) captureShot(win);
   });
 
   /* external links open in the real browser, never inside the app */
@@ -99,11 +123,11 @@ function createWindow(openPath){
   return win;
 }
 
-/* INKWELL_SHOT=<file> boots, optionally opens INKWELL_SHOT_VAULT, writes a PNG
+/* INKJU_SHOT=<file> boots, optionally opens INKJU_SHOT_VAULT, writes a PNG
    of the window and exits. Used to review the interface without a screen. */
 async function captureShot(win){
   try {
-    const v = process.env.INKWELL_SHOT_VAULT;
+    const v = process.env.INKJU_SHOT_VAULT;
     if (v) {
       await search.setRoot(v);
       store.save({ vault: v });
@@ -111,22 +135,22 @@ async function captureShot(win){
         'import("./js/vault.js").then(V => V.restoreVault(' + JSON.stringify(v) + '))', true);
     }
     await new Promise(r => setTimeout(r, 900));
-    if (process.env.INKWELL_SHOT_SCRIPT) {
+    if (process.env.INKJU_SHOT_SCRIPT) {
       await win.webContents.executeJavaScript(
-        require("fs").readFileSync(process.env.INKWELL_SHOT_SCRIPT, "utf8"), true);
+        require("fs").readFileSync(process.env.INKJU_SHOT_SCRIPT, "utf8"), true);
       await new Promise(r => setTimeout(r, 700));
     }
     const img = await win.webContents.capturePage();
-    await fsp.writeFile(process.env.INKWELL_SHOT, img.toPNG());
-    console.log("SHOT " + process.env.INKWELL_SHOT);
+    await fsp.writeFile(process.env.INKJU_SHOT, img.toPNG());
+    console.log("SHOT " + process.env.INKJU_SHOT);
   } catch (err) { console.log("SHOT FAILED " + err.message); }
   setTimeout(() => app.quit(), 150);
 }
 
-/* INKWELL_SMOKE=1 boots the app, asserts the renderer came up, prints a report
+/* INKJU_SMOKE=1 boots the app, asserts the renderer came up, prints a report
    and exits. Used by the release checks; invisible in normal runs. */
 async function runSmoke(win){
-  const file = process.env.INKWELL_SMOKE_FILE || path.join(__dirname, "..", "..", "test", "smoke-renderer.js");
+  const file = process.env.INKJU_SMOKE_FILE || path.join(__dirname, "..", "..", "test", "smoke-renderer.js");
   let script;
   try { script = require("fs").readFileSync(file, "utf8"); }
   catch (err) {
@@ -140,7 +164,7 @@ async function runSmoke(win){
   let prelude = "";
   try {
     const fsn = require("fs");
-    const dir = path.join(os.tmpdir(), "inkwell-smoke-vault-" + process.pid);
+    const dir = path.join(os.tmpdir(), "inkju-smoke-vault-" + process.pid);
     fsn.rmSync(dir, { recursive: true, force: true });
     fsn.mkdirSync(path.join(dir, "notes"), { recursive: true });
     fsn.writeFileSync(path.join(dir, "Alpha.md"), "# Alpha\n\nPoints at [[Beta]].\n");
@@ -149,7 +173,7 @@ async function runSmoke(win){
   } catch (err) {
     console.log("smoke: could not build the fixture vault: " + err.message);
   }
-  prelude += "globalThis.__fakeUpdate = " + JSON.stringify(process.env.INKWELL_FAKE_UPDATE || null) + ";\n";
+  prelude += "globalThis.__fakeUpdate = " + JSON.stringify(process.env.INKJU_FAKE_UPDATE || null) + ";\n";
   /* Bring the window forward before the checks run. Parts of the editor hide
      themselves on blur — the floating menu most of all — so a window that never
      came to the front fails checks for reasons that have nothing to do with
@@ -370,7 +394,7 @@ handle("export:pdf", async (suggested, html) => {
   });
   if (r.canceled) return null;
 
-  const tmp = path.join(os.tmpdir(), "inkwell-print-" + Date.now() + ".html");
+  const tmp = path.join(os.tmpdir(), "inkju-print-" + Date.now() + ".html");
   await fsp.writeFile(tmp, html, "utf8");
   const hidden = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
   try {
@@ -390,7 +414,7 @@ handle("export:pdf", async (suggested, html) => {
 });
 
 handle("print", async html => {
-  const tmp = path.join(os.tmpdir(), "inkwell-print-" + Date.now() + ".html");
+  const tmp = path.join(os.tmpdir(), "inkju-print-" + Date.now() + ".html");
   await fsp.writeFile(tmp, html, "utf8");
   const hidden = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
   await hidden.loadFile(tmp);

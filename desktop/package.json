@@ -1,7 +1,7 @@
 {
-  "name": "inkwell",
-  "productName": "Inkwell",
-  "version": "2.1.9",
+  "name": "inkju",
+  "productName": "Inkju",
+  "version": "2.2.0",
   "description": "A quiet markdown editor for the desktop",
   "main": "src/main/main.js",
   "author": "Roy Villasana",
@@ -16,8 +16,8 @@
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
-    "test:app": "INKWELL_SMOKE=1 electron .",
-    "test:updates": "INKWELL_SMOKE=1 INKWELL_FAKE_UPDATE=9.9.9 electron .",
+    "test:app": "INKJU_SMOKE=1 electron .",
+    "test:updates": "INKJU_SMOKE=1 INKJU_FAKE_UPDATE=9.9.9 electron .",
     "test:all": "npm test && npm run test:mcp && npm run test:app && npm run test:updates",
     "postinstall": "node scripts/vendor.js",
     "vendor": "node scripts/vendor.js",
@@ -47,8 +47,8 @@
     "zod": "^4.4.3"
   },
   "build": {
-    "appId": "com.royvillasana.inkwell",
-    "productName": "Inkwell",
+    "appId": "com.royvillasana.inkju",
+    "productName": "Inkju",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -71,7 +71,7 @@
       "darkModeSupport": true,
       "icon": "build/icon.icns",
       "identity": null,
-      "artifactName": "Inkwell-${version}-arm64.${ext}",
+      "artifactName": "Inkju-${version}-arm64.${ext}",
       "extendInfo": {
         "NSHumanReadableCopyright": "MIT licensed",
         "CFBundleDocumentTypes": [
@@ -115,7 +115,7 @@
       }
     ],
     "dmg": {
-      "title": "Inkwell ${version}",
+      "title": "Inkju ${version}",
       "contents": [
         {
           "x": 140,

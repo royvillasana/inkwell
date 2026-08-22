@@ -105,7 +105,7 @@ export async function hydrate(root){
     if (hit) { host.innerHTML = hit; continue; }
 
     try {
-      const { svg } = await mermaid.render("inkwell-d" + (++seq), src);
+      const { svg } = await mermaid.render("inkju-d" + (++seq), src);
       cache.set(src + "|" + mermaidTheme, svg);
       if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
       host.innerHTML = svg;

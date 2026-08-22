@@ -1,11 +1,11 @@
 ---
 title: Updates
-tags: [inkwell, releases]
+tags: [inkju, releases]
 ---
 
 # Updates
 
-Release history for Inkwell, newest first. Current version: **2.1.2**.
+Release history for Inkju, newest first. Current version: **2.1.2**.
 Back to [[Index]].
 
 | Version | Tag | Date | Headline |
@@ -25,7 +25,7 @@ On `main`, not yet cut as a release.
   wiki link resolution, outlines, and edits that work on structure rather than
   raw text. Three rules it will not break: nothing leaves the vault, nothing is
   deleted outright, nothing is one way. Details in [[MCP Server]].
-- **Update notices.** Inkwell asks GitHub's releases API whether a newer version
+- **Update notices.** Inkju asks GitHub's releases API whether a newer version
   exists and shows a small card in the bottom left if so. Its button downloads
   the disk image and opens it. This is the only network request the app makes,
   it carries no identifiers, and Preferences can switch it off.

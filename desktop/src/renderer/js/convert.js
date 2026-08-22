@@ -24,7 +24,7 @@ export function initTurndown(){
     td.use([window.turndownPluginGfm.tables, window.turndownPluginGfm.strikethrough,
             window.turndownPluginGfm.taskListItems]);
   }
-  /* KaTeX output pasted from another Inkwell window comes back as maths */
+  /* KaTeX output pasted from another Inkju window comes back as maths */
   td.addRule("katex", {
     filter: node => node.classList && node.classList.contains("katex"),
     replacement: (content, node) => {

@@ -16,8 +16,8 @@
   const md  = await import("./js/markdown.js");
   const { state } = mod;
 
-  check("bridge exposed", !!window.inkwell && window.inkwell.isDesktop);
-  check("dropped-file paths readable in sandbox", window.inkwell.canReadDroppedPaths === true);
+  check("bridge exposed", !!window.inkju && window.inkju.isDesktop);
+  check("dropped-file paths readable in sandbox", window.inkju.canReadDroppedPaths === true);
   check("no node in renderer", typeof require === "undefined" && typeof process === "undefined");
   check("document loaded", state.blocks.length > 1, "blocks=" + state.blocks.length);
   check("paper rendered", $("#paper").children.length > 1);
@@ -62,11 +62,11 @@
 
   // main-process round trip through the bridge
   let settings = null;
-  try { settings = await window.inkwell.settings.get(); } catch (e) {}
+  try { settings = await window.inkju.settings.get(); } catch (e) {}
   check("IPC round trip", !!settings && typeof settings.theme === "string");
 
   let css = "";
-  try { css = await window.inkwell.assets.css(); } catch (e) {}
+  try { css = await window.inkju.assets.css(); } catch (e) {}
   check("export stylesheet readable", css.length > 1000, "len=" + css.length);
 
   /* ---- rich text mode: the default view, and its three menus ---- */
@@ -207,24 +207,24 @@
       !ctx.classList.contains("on") && !bar.classList.contains("open"));
 
     /* rename through the real IPC, then put it back so the run repeats */
-    const renamed = await window.inkwell.vault.rename(fixture, "Smoke Renamed");
+    const renamed = await window.inkju.vault.rename(fixture, "Smoke Renamed");
     check("renaming moves the folder itself",
       renamed.root.endsWith("Smoke Renamed") && renamed.from === fixture, JSON.stringify(renamed.root));
     check("the notes come with it", renamed.tree.length === 2, "tree=" + renamed.tree.length);
-    const readBack = await window.inkwell.file.read(renamed.root + "/Alpha.md");
+    const readBack = await window.inkju.file.read(renamed.root + "/Alpha.md");
     check("a note inside is readable at its new path", readBack.text.includes("# Alpha"));
-    const back = await window.inkwell.vault.rename(renamed.root, name);
+    const back = await window.inkju.vault.rename(renamed.root, name);
     check("renaming back restores the path", back.root === fixture);
 
-    await window.inkwell.vault.close();
+    await window.inkju.vault.close();
     check("closing a vault leaves the files alone",
-      (await window.inkwell.file.read(fixture + "/Alpha.md")).text.includes("# Alpha"));
+      (await window.inkju.file.read(fixture + "/Alpha.md")).text.includes("# Alpha"));
   } catch (err) {
     check("the vault checks ran without throwing", false, err.message);
   }
 
   /* ---- the update notice -------------------------------------------------
-     Only under INKWELL_FAKE_UPDATE, which stands in for a newer release so the
+     Only under INKJU_FAKE_UPDATE, which stands in for a newer release so the
      whole flow is exercisable without publishing one. */
   const fake = globalThis.__fakeUpdate;
   check("update flow is exercisable", typeof fake !== "undefined");
@@ -255,6 +255,6 @@
     ran,
     blocks: state.blocks.length,
     theme: document.documentElement.dataset.theme,
-    platform: window.inkwell.platform
+    platform: window.inkju.platform
   };
 })()

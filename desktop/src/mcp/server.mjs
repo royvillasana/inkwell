@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ===========================================================================
-   Inkwell MCP server — lets an agent work inside a vault.
+   Inkju MCP server — lets an agent work inside a vault.
    =========================================================================== */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -24,13 +24,13 @@ const search = require(path.join(here, "..", "main", "search.js"));
    agent and the window you are looking at are never out of step. */
 function settingsPath(){
   if (process.platform === "darwin")
-    return path.join(os.homedir(), "Library", "Application Support", "Inkwell", "settings.json");
+    return path.join(os.homedir(), "Library", "Application Support", "Inkju", "settings.json");
   if (process.platform === "win32")
-    return path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Inkwell", "settings.json");
-  return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "Inkwell", "settings.json");
+    return path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Inkju", "settings.json");
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "Inkju", "settings.json");
 }
 
-/* Pinned by --vault or INKWELL_VAULT: that choice is fixed for the process.
+/* Pinned by --vault or INKJU_VAULT: that choice is fixed for the process.
    With neither, we follow the app, and "follow" has to mean per call — the app
    can switch vaults at any time, and a server that resolved once at startup
    would keep reading and writing the previous one, quietly, while the window
@@ -38,7 +38,7 @@ function settingsPath(){
 function pinnedVault(){
   const flag = process.argv.indexOf("--vault");
   if (flag > -1 && process.argv[flag + 1]) return path.resolve(process.argv[flag + 1]);
-  if (process.env.INKWELL_VAULT) return path.resolve(process.env.INKWELL_VAULT);
+  if (process.env.INKJU_VAULT) return path.resolve(process.env.INKJU_VAULT);
   return null;
 }
 
@@ -55,7 +55,7 @@ const resolveVault = () => PINNED || appVault();
 
 let VAULT = resolveVault();
 if (!VAULT || !fs.existsSync(VAULT)) {
-  console.error("inkwell-mcp: no vault. Pass --vault <folder>, set INKWELL_VAULT, or open a vault in Inkwell first.");
+  console.error("inkju-mcp: no vault. Pass --vault <folder>, set INKJU_VAULT, or open a vault in Inkju first.");
   process.exit(1);
 }
 
@@ -63,13 +63,13 @@ if (!VAULT || !fs.existsSync(VAULT)) {
 let indexedRoot = null;
 async function syncVault(){
   const next = resolveVault();
-  if (!next) throw new Error("Inkwell has no vault open. Open one, or start this server with --vault.");
+  if (!next) throw new Error("Inkju has no vault open. Open one, or start this server with --vault.");
   if (!fs.existsSync(next)) throw new Error("The vault at " + next + " is not there any more.");
   VAULT = next;
   if (VAULT !== indexedRoot) {
     await search.setRoot(VAULT);
     indexedRoot = VAULT;
-    console.error("inkwell-mcp: serving " + VAULT);
+    console.error("inkju-mcp: serving " + VAULT);
   }
 }
 
@@ -111,7 +111,7 @@ async function reindex(file){
 }
 
 /* ---- server --------------------------------------------------------------- */
-const server = new McpServer({ name: "inkwell", version: "1.0.0" });
+const server = new McpServer({ name: "inkju", version: "1.0.0" });
 
 /* Wrap once rather than remembering to call syncVault() in fifteen handlers —
    the one that gets forgotten is the one that writes to the wrong vault. */
@@ -121,7 +121,7 @@ server.registerTool = (name, meta, handler) =>
 
 server.registerTool("list_notes", {
   title: "List notes",
-  description: "Every markdown note in the Inkwell vault, as paths relative to the vault root.",
+  description: "Every markdown note in the Inkju vault, as paths relative to the vault root.",
   inputSchema: { folder: z.string().optional().describe("Limit to a subfolder, relative to the vault root") }
 }, async ({ folder }) => {
   const root = folder ? resolveNote(folder, { mustExist: false }) : VAULT;
@@ -180,7 +180,7 @@ server.registerTool("create_note", {
 
 server.registerTool("write_note", {
   title: "Replace a note's contents",
-  description: "Overwrite a note with new markdown. The previous version is snapshotted first, so it stays recoverable from Inkwell's version history.",
+  description: "Overwrite a note with new markdown. The previous version is snapshotted first, so it stays recoverable from Inkju's version history.",
   inputSchema: {
     note: z.string().describe("Note name or path"),
     content: z.string().describe("The complete new markdown")
@@ -342,10 +342,10 @@ server.registerTool("vault_info", {
   title: "About this vault",
   description: "Where the vault is and how much is in it.",
   inputSchema: {}
-}, async () => json({ vault: VAULT, following: PINNED ? "pinned" : "whichever vault Inkwell has open", ...search.stats() }));
+}, async () => json({ vault: VAULT, following: PINNED ? "pinned" : "whichever vault Inkju has open", ...search.stats() }));
 
 /* ---- go ------------------------------------------------------------------- */
 await search.setRoot(VAULT);
 indexedRoot = VAULT;
 await server.connect(new StdioServerTransport());
-console.error("inkwell-mcp: serving " + VAULT + (PINNED ? " (pinned)" : " (following Inkwell)"));
+console.error("inkju-mcp: serving " + VAULT + (PINNED ? " (pinned)" : " (following Inkju)"));

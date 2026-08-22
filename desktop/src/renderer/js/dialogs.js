@@ -1,5 +1,5 @@
 /* ===========================================================================
-   In-app dialogs. Nothing in Inkwell calls window.confirm, alert or prompt.
+   In-app dialogs. Nothing in Inkju calls window.confirm, alert or prompt.
    dialog() resolves with the chosen button value, or the field values when
    the dialog has fields.
    =========================================================================== */
@@ -170,7 +170,7 @@ modal.root.addEventListener("keydown", e => {
 
 /* --- the three replacements for the browser primitives ------------------- */
 export const say = (message, title) => dialog({
-  title: title || "Inkwell", message,
+  title: title || "Inkju", message,
   buttons: [{ label: "OK", value: true, primary: true }]
 });
 
@@ -183,7 +183,7 @@ export const ask = (message, opt = {}) => dialog({
 }).then(v => v === true);
 
 export const askText = (message, value, opt = {}) => dialog({
-  title: opt.title || "Inkwell", message,
+  title: opt.title || "Inkju", message,
   fields: [{ name: "value", label: opt.label || "", value: value || "", placeholder: opt.placeholder }],
   buttons: [{ label: "Cancel", value: "cancel" }, { label: opt.ok || "OK", value: "ok", primary: true }]
 }).then(r => (r && r.action === "ok" ? r.value : null));

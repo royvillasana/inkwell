@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-tags: [inkwell, roadmap]
+tags: [inkju, roadmap]
 ---
 
 # Roadmap

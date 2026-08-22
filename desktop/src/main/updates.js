@@ -6,14 +6,14 @@
  * Our builds are ad-hoc signed (see scripts/adhoc-sign.js), so it would fail at
  * the last step. We do the same job ourselves instead — verify the download
  * against GitHub's published checksum, check the bundle inside it really is a
- * newer Inkwell with an intact signature, then swap it in and relaunch. See
+ * newer Inkju with an intact signature, then swap it in and relaunch. See
  * installInPlace below. Handing over the disk image is now only the fallback,
  * for when the app cannot write to where it is installed.
  *
  * A Developer ID would still be worth having: it would let this happen on quit
  * with no prompt, and would spare new users the "damaged" warning on first run.
  *
- * This is the ONLY network request Inkwell makes, it goes to api.github.com,
+ * This is the ONLY network request Inkju makes, it goes to api.github.com,
  * it sends no identifiers, and it can be turned off in Preferences.
  */
 const { net, app, shell } = require("electron");
@@ -24,7 +24,7 @@ const fsp = fs.promises;
 const path = require("path");
 const os = require("os");
 
-const REPO = "royvillasana/inkwell";
+const REPO = "royvillasana/inkju";
 const API = "https://api.github.com/repos/" + REPO + "/releases/latest";
 const RELEASES_PAGE = "https://github.com/" + REPO + "/releases/latest";
 
@@ -42,7 +42,7 @@ function compareVersions(a, b){
 function request(url, { json = false, timeout = 12000 } = {}){
   return new Promise((resolve, reject) => {
     const req = net.request({ url, redirect: "follow" });
-    req.setHeader("User-Agent", "Inkwell/" + app.getVersion());
+    req.setHeader("User-Agent", "Inkju/" + app.getVersion());
     if (json) req.setHeader("Accept", "application/vnd.github+json");
 
     const timer = setTimeout(() => { req.abort(); reject(new Error("The update check timed out.")); }, timeout);
@@ -80,9 +80,9 @@ function pickAsset(assets){
   return list.find(a => /\.(AppImage|deb)$/i.test(a.name)) || null;
 }
 
-/* INKWELL_FAKE_UPDATE=<version> makes the whole flow exercisable without a
+/* INKJU_FAKE_UPDATE=<version> makes the whole flow exercisable without a
    release to download. Absent in every normal run. */
-const FAKE = process.env.INKWELL_FAKE_UPDATE || null;
+const FAKE = process.env.INKJU_FAKE_UPDATE || null;
 
 async function check(){
   if (FAKE) {
@@ -90,10 +90,10 @@ async function check(){
       current: app.getVersion(),
       latest: FAKE,
       newer: compareVersions(FAKE, app.getVersion()) > 0,
-      name: "Inkwell " + FAKE,
+      name: "Inkju " + FAKE,
       notes: "Pretend release used by the tests.",
       page: RELEASES_PAGE,
-      asset: { name: "Inkwell-" + FAKE + "-arm64.dmg", url: "fake://asset", size: 4, digest: null }
+      asset: { name: "Inkju-" + FAKE + "-arm64.dmg", url: "fake://asset", size: 4, digest: null }
     };
   }
   const release = await request(API, { json: true });
@@ -104,7 +104,7 @@ async function check(){
     current,
     latest,
     newer: compareVersions(latest, current) > 0,
-    name: release.name || ("Inkwell " + latest),
+    name: release.name || ("Inkju " + latest),
     notes: (release.body || "").slice(0, 4000),
     page: release.html_url || RELEASES_PAGE,
     asset: asset ? { name: asset.name, url: asset.browser_download_url, size: asset.size, digest: asset.digest || null } : null
@@ -127,7 +127,7 @@ function download(asset, onProgress){
     const tmp = target + ".part";
 
     const req = net.request({ url: asset.url, redirect: "follow" });
-    req.setHeader("User-Agent", "Inkwell/" + app.getVersion());
+    req.setHeader("User-Agent", "Inkju/" + app.getVersion());
 
     req.on("response", res => {
       if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -176,7 +176,7 @@ function download(asset, onProgress){
 
    Nothing here patches files inside the installed app. A macOS bundle's
    signature seals every file it contains, so editing one in place is exactly
-   what produces "Inkwell is damaged and can't be opened". The whole bundle is
+   what produces "Inkju is damaged and can't be opened". The whole bundle is
    replaced, atomically, or nothing happens at all. */
 
 const run = (cmd, args, opts = {}) => new Promise((resolve, reject) => {
@@ -193,7 +193,7 @@ const q = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
 function swapScript({ appPath, staged, backup, pid, logFile, launcher = "open" }){
   return [
     "#!/bin/sh",
-    "# Written by Inkwell to finish an update. Safe to delete.",
+    "# Written by Inkju to finish an update. Safe to delete.",
     "exec >>" + q(logFile) + " 2>&1",
     'echo "--- swap started $(date)"',
     "i=0",
@@ -223,7 +223,7 @@ function swapScript({ appPath, staged, backup, pid, logFile, launcher = "open" }
 
 /* The installed bundle, derived from the running binary rather than assumed. */
 function bundlePath(){
-  const exe = app.getPath("exe");                     // …/Inkwell.app/Contents/MacOS/Inkwell
+  const exe = app.getPath("exe");                     // …/Inkju.app/Contents/MacOS/Inkju
   const guess = path.resolve(exe, "..", "..", "..");
   return guess.endsWith(".app") ? guess : null;
 }
@@ -242,7 +242,7 @@ async function vetBundle(candidate){
   const id = (await run("/usr/bin/defaults", ["read", plist, "CFBundleIdentifier"])).trim();
   const version = (await run("/usr/bin/defaults", ["read", plist, "CFBundleShortVersionString"])).trim();
 
-  if (id !== "com.royvillasana.inkwell") throw new Error("That disk image contains " + id + ", not Inkwell.");
+  if (id !== "com.royvillasana.inkju") throw new Error("That disk image contains " + id + ", not Inkju.");
   if (compareVersions(version, app.getVersion()) <= 0) {
     throw new Error("That disk image holds " + version + ", which is not newer than " + app.getVersion() + ".");
   }
@@ -256,15 +256,15 @@ async function vetBundle(candidate){
 async function installInPlace(dmg){
   if (process.platform !== "darwin") throw new Error("In-place install is macOS only.");
   const appPath = bundlePath();
-  if (!appPath) throw new Error("Inkwell is not running from an app bundle.");
+  if (!appPath) throw new Error("Inkju is not running from an app bundle.");
 
   const parent = path.dirname(appPath);
   /* staging must share the volume with the app, or the rename is not atomic */
   await fsp.access(parent, fs.constants.W_OK)
-    .catch(() => { throw new Error("Inkwell cannot write to " + parent + ", so it cannot replace itself."); });
+    .catch(() => { throw new Error("Inkju cannot write to " + parent + ", so it cannot replace itself."); });
 
-  const mountPoint = path.join(os.tmpdir(), "inkwell-update-" + process.pid);
-  const staged = path.join(parent, ".Inkwell-update-" + process.pid + ".app");
+  const mountPoint = path.join(os.tmpdir(), "inkju-update-" + process.pid);
+  const staged = path.join(parent, ".Inkju-update-" + process.pid + ".app");
   let mounted = false;
   try {
     const candidate = await mountedApp(dmg, mountPoint);
@@ -280,7 +280,7 @@ async function installInPlace(dmg){
     mounted = false;
 
     const logFile = path.join(app.getPath("userData"), "update.log");
-    const script = path.join(os.tmpdir(), "inkwell-swap-" + process.pid + ".sh");
+    const script = path.join(os.tmpdir(), "inkju-swap-" + process.pid + ".sh");
     await fsp.writeFile(script, swapScript({
       appPath, staged, backup: staged + ".old", pid: process.pid, logFile
     }), { mode: 0o700 });
