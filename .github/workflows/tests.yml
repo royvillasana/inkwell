@@ -93,6 +93,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
         working-directory: .
 
+      # This version of the electron package has no postinstall, so the binary
+      # is fetched lazily the first time `electron` is run — which is after the
+      # step below needs it to exist. Fetch it up front instead.
+      - name: Fetch the Electron binary
+        run: node node_modules/electron/install.js
+
       # Chromium's setuid sandbox helper has to be owned by root and mode 4755,
       # and npm cannot install a file that way. The usual answer is to run with
       # --no-sandbox; that is the wrong answer here. A sandboxed renderer is one
