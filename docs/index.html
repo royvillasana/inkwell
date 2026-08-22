@@ -77,7 +77,13 @@ nav{
   font-size:14px;max-width:calc(100% - 32px)
 }
 nav .name{display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:-.02em}
-nav .name img{width:20px;height:20px;border-radius:6px}
+/* The mark, not the boxed app icon: at 20px the icon was a smudge, and its rim
+   and background fought the pill it sits on. Silver on a near-white pill is a
+   soft contrast, so it gets size and a hairline shadow rather than a box. */
+nav .name img{
+  width:auto;height:30px;border-radius:0;margin:-4px 0;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.28))
+}
 nav .links{display:flex;align-items:center;gap:4px;margin-left:10px}
 nav .links a{padding:7px 12px;border-radius:999px;color:var(--p-soft);font-weight:500;transition:.15s;white-space:nowrap}
 nav .links a:hover{background:rgba(0,0,0,.06);color:var(--p-ink)}
@@ -328,7 +334,7 @@ nav .get:hover{background:#000}
 footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-rule)}
 .foot{display:flex;flex-wrap:wrap;gap:22px;align-items:center;font-size:14.5px;color:var(--n-faint)}
 .foot .name{display:flex;align-items:center;gap:9px;font-weight:600;color:var(--n-ink);letter-spacing:-.02em}
-.foot .name img{width:22px;height:22px;border-radius:7px}
+.foot .name img{width:auto;height:30px;border-radius:0;margin:-4px 0}
 .foot nav{position:static;transform:none;background:none;box-shadow:none;padding:0;backdrop-filter:none}
 .foot a{color:var(--n-soft);transition:.15s}
 .foot a:hover{color:var(--accent)}
@@ -359,7 +365,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 <body>
 
 <nav>
-  <a class="name" href="#top"><img src="assets/icon.png" alt=""> Inkwell</a>
+  <a class="name" href="#top"><img src="assets/logo-feather.png" srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x" alt="" width="313" height="256"> Inkwell</a>
   <span class="links">
     <a class="opt" href="#features">Features</a>
     <a class="opt" href="#builds">Builds</a>
@@ -618,7 +624,7 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 
 <footer>
   <div class="wrap foot">
-    <a class="name" href="#top"><img src="assets/icon.png" alt=""> Inkwell</a>
+    <a class="name" href="#top"><img src="assets/logo-feather.png" srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x" alt="" width="313" height="256"> Inkwell</a>
     <span>MIT licensed</span>
     <span class="right">
       <a href="https://github.com/royvillasana/inkwell">GitHub</a>
