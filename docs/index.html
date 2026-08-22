@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inkwell — see your words, not the syntax</title>
 <meta name="description" content="A markdown editor that shows the source only for the block you are editing. Everything else stays finished prose. Free, open source, no accounts, no telemetry.">
-<link rel="icon" href="assets/icon.png">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" href="assets/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#16171a">
 <meta property="og:title" content="Inkwell — see your words, not the syntax">
 <meta property="og:description" content="A markdown editor with vaults, real Mermaid and real KaTeX. Free and open source.">
 <meta property="og:image" content="https://royvillasana.github.io/inkwell/assets/screenshot.png">
@@ -123,6 +127,12 @@ nav .get:hover{background:#000}
   background-size:3px 3px;mix-blend-mode:overlay
 }
 .hero-copy{text-align:center;position:relative;z-index:2}
+/* the mark, above the headline — silver on the dark hero, with a soft shadow so
+   it sits on the glow rather than floating over it */
+.hero-mark{
+  width:clamp(76px,8.4vw,108px);height:auto;margin:0 auto 22px;
+  filter:drop-shadow(0 12px 26px rgba(0,0,0,.55))
+}
 .hero h1{margin-bottom:26px}
 .hero .lede{margin:0 auto;color:var(--n-soft);max-width:48ch}
 .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:38px}
@@ -361,6 +371,9 @@ footer{background:var(--n-bg);padding:56px 0 70px;border-top:1px solid var(--n-r
 <!-- ============================ hero ============================ -->
 <header class="hero" id="top">
   <div class="wrap hero-copy">
+    <img class="hero-mark" src="assets/logo-feather.png"
+         srcset="assets/logo-feather.png 1x, assets/logo-feather@2x.png 2x"
+         alt="" width="313" height="256" fetchpriority="high">
     <h1>See your words,<br>not the <em class="acc">syntax</em></h1>
     <p class="lede">Inkwell reveals markdown source only for the block you are editing.
       Everything else stays finished prose — click away and the asterisks disappear.</p>
