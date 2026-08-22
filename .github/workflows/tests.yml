@@ -1,0 +1,123 @@
+# Every check that does not need a person.
+#
+# `npm run test:all` is the same four steps in one line locally; they are split
+# here so a failure names itself in the job list rather than in a log.
+#
+# What this cannot cover: the OAuth flow against a real Google account. That
+# needs a consent screen and a human, so it stays a release step. Everything
+# else — the vault, the MCP server, the MCP client against a fixture, the
+# credential store, the connection allowlist, and the app booting into a real
+# window — runs here.
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: desktop
+
+jobs:
+  unit:
+    name: Unit and MCP · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # postinstall vendors mermaid, KaTeX, turndown and TipTap out of
+      # node_modules into src/renderer/vendor. It fetches nothing.
+      - run: npm ci
+
+      # files, search, the credential store, the connection registry, the MCP
+      # client against a fixture server, OAuth, the cloud layer, iCloud, and the
+      # standing security guarantees.
+      - name: Unit tests
+        run: npm test
+
+      # the other direction: Inkju's own MCP server, driven as a client would.
+      - name: MCP server
+        run: npm run test:mcp
+
+  app:
+    name: App smoke · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # Electron is a ~100 MB download and the version only moves when
+      # package.json does.
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('desktop/package-lock.json') }}
+
+      - run: npm ci
+
+      # Electron needs a display. macOS runners have one; Linux does not.
+      - name: Install xvfb
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+        working-directory: .
+
+      # This version of the electron package has no postinstall, so the binary
+      # is fetched lazily the first time `electron` is run — which is after the
+      # step below needs it to exist. Fetch it up front instead.
+      - name: Fetch the Electron binary
+        run: node node_modules/electron/install.js
+
+      # Chromium's setuid sandbox helper has to be owned by root and mode 4755,
+      # and npm cannot install a file that way. The usual answer is to run with
+      # --no-sandbox; that is the wrong answer here. A sandboxed renderer is one
+      # of the things these tests exist to hold in place, and switching it off
+      # to make the job go green would leave us testing something other than
+      # what ships. So the helper is given the permissions it wants instead.
+      - name: Let Electron keep its sandbox
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      # Boots the real app, asserts the renderer came up, and checks 72 things
+      # in it — including that a document from a connection cannot put raw HTML
+      # into the page, and that a build without --connections is inert.
+      - name: App smoke
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run test:app
+
+      # the same boot with an update pretending to be available, which walks
+      # the update card, the download and the staged swap.
+      - name: Update flow
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run test:updates

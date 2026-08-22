@@ -23,6 +23,10 @@ const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>
 
 /* ---- block splitting ---------------------------------------------------- */
 const RE_ATX   = /^\s{0,3}#{1,6}(\s|$)/;
+
+/* Whether the document being rendered came from somewhere other than this
+   disk. See setUntrusted() below — this is document-scoped, not call-scoped. */
+let untrusted = false;
 const RE_HR    = /^\s{0,3}([-*_])[ \t]*(\1[ \t]*){2,}$/;
 const RE_FENCE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
 const RE_LI    = /^(\s*)([-*+]|\d{1,9}[.)])(\s+|$)/;
@@ -116,6 +120,32 @@ function splitBlocks(text){
 const SENT = String.fromCharCode(1);
 const RE_SENT = new RegExp(SENT + "(\\d+)" + SENT, "g");
 
+/* A URL out of a document, made safe to put in an href or a src.
+
+   The text has already been escaped by the time these run, so an attacker
+   cannot break out of the attribute — but the *scheme* is still whatever the
+   document said, and "javascript:" in an href is a script that runs on click.
+   The renderer's CSP would refuse it and the desktop app now only hands http
+   and https to the browser, but neither of those is a reason to emit it: a
+   note is text, and text that came from someone else's Drive is text we did
+   not write.
+
+   Whitespace and control characters are stripped before the scheme is read,
+   because "java\tscript:" and "java&#10;script:" are the same URL to a browser
+   and a different string to a naive check. */
+const UNSAFE_SCHEME = new RegExp("^[\\u0000-\\u0020]*(javascript|vbscript|data|about|blob)\\s*:", "i");
+function safeUrl(url, opts){
+  let u = String(url == null ? "" : url);
+  const bare = u.replace(new RegExp("[\\u0000-\\u0020]", "g"), "");
+  /* images may carry a data: URL — that is how a pasted screenshot is stored —
+     but only a real image one, never a document that would be scripted */
+  if (opts && opts.image && /^data:image\/(png|jpe?g|gif|webp|avif);base64,[a-z0-9+/=]+$/i.test(bare)) {
+    return u;
+  }
+  if (UNSAFE_SCHEME.test(bare)) return "#";
+  return u;
+}
+
 function inline(md){
   const bin = [];
   const K = html => SENT + (bin.push(html) - 1) + SENT;
@@ -130,11 +160,11 @@ function inline(md){
       (_, page, label) => K('<a class="wiki" href="#" data-page="' + page.trim() + '">' + (label || page).trim() + "</a>"));
 
   t = t.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+["']([^"']*)["'])?\s*\)/g,
-      (_, alt, src, ti) => K('<img src="' + src + '" alt="' + alt + '"' + (ti ? ' title="' + ti + '"' : "") + ">"));
+      (_, alt, src, ti) => K('<img src="' + safeUrl(src, { image: true }) + '" alt="' + alt + '"' + (ti ? ' title="' + ti + '"' : "") + ">"));
   t = t.replace(/\[\^([^\]\s]+)\]/g,
       (_, id) => K('<sup class="fnref"><a href="#fn-' + id + '">' + esc(id) + "</a></sup>"));
   t = t.replace(/\[([^\]]*)\]\(\s*([^)\s]*)(?:\s+["']([^"']*)["'])?\s*\)/g,
-      (_, txt, href, ti) => K('<a href="' + href + '"' + (ti ? ' title="' + ti + '"' : "") + ' target="_blank" rel="noopener">') + txt + K("</a>"));
+      (_, txt, href, ti) => K('<a href="' + safeUrl(href) + '"' + (ti ? ' title="' + ti + '"' : "") + ' target="_blank" rel="noopener">') + txt + K("</a>"));
   t = t.replace(/&lt;((?:https?|mailto):[^\s&]+)&gt;/g,
       (_, u) => K('<a href="' + u + '" target="_blank" rel="noopener">' + u + "</a>"));
   t = t.replace(/(^|[\s(])(https?:\/\/[^\s<>"']+[^\s<>"'.,:;)\]])/g,
@@ -386,7 +416,10 @@ function renderBlock(src){
   if (s.includes("|") && s.split("\n")[1] && RE_TSEP.test(s.split("\n")[1])) return renderTable(s);
   if (RE_LI.test(first)) return renderList(s);
   if (/^ {4,}\S/.test(first)) return "<pre><code>" + esc(s.replace(/^ {4}/gm, "")) + "</code></pre>";
-  if (/^\s{0,3}<[a-zA-Z!\/]/.test(first)) return s;
+  /* Raw HTML passes through, because that is what markdown does and people
+     write it in their own notes on purpose. It does not pass through when the
+     document came from somewhere else: see renderUntrusted below. */
+  if (/^\s{0,3}<[a-zA-Z!\/]/.test(first)) return untrusted ? "<p>" + esc(s) + "</p>" : s;
 
   const lines = s.split("\n");
   if (lines.length >= 2 && /^\s{0,3}=+\s*$/.test(lines[lines.length - 1])) {
@@ -405,6 +438,43 @@ function renderBlock(src){
 }
 
 const renderDoc = text => splitBlocks(text).map(renderBlock).join("\n");
+
+/* Render a document Inkju did not get off the user's own disk.
+
+   The only difference is that raw HTML blocks are shown as text rather than
+   inserted into the page. Inline HTML is already escaped for every document,
+   and link schemes are already filtered for every document; this closes the
+   one remaining hole, which markdown leaves open on purpose.
+
+   The document itself is never altered — this changes how it is displayed, not
+   what it says. A note fetched from a connection is still the note that is in
+   the connection, byte for byte, and saving it back writes what the user typed
+   rather than what we felt safe rendering.
+
+   A flag rather than an argument because renderBlock recurses through blockquotes,
+   list items and table cells; threading an option through all of them would
+   leave exactly one path that forgot, and that path would be the interesting one. */
+function renderUntrusted(text){
+  const before = untrusted;
+  untrusted = true;
+  try { return renderDoc(text); }
+  finally { untrusted = before; }
+}
+
+/* Mark the *document* as untrusted, for as long as it is the open document.
+
+   The first version of this offered only renderUntrusted() and expected every
+   caller to opt in. That was the wrong shape and it failed exactly as you would
+   expect: there are six places that turn markdown into HTML — the block
+   renderer, the split preview, presentation mode, the rich-text editor, the
+   converter and the HTML exporter — and remote documents reached all six
+   through the ordinary path, so the safe renderer was never called at all.
+
+   Trust is a property of the document, not of the call site. It is set once,
+   where a document is loaded, and every renderer inherits it without having to
+   remember. Adding a seventh renderer later cannot reintroduce the hole. */
+function setUntrusted(flag){ untrusted = !!flag; }
+function isUntrusted(){ return untrusted; }
 
 /* ---- block classification (drives live textarea styling + Enter rules) --- */
 function blockType(src){
@@ -804,6 +874,6 @@ export function renderTOC(){
 
 export {
   esc, splitBlocks, inline, highlight, renderList, renderTable, renderBlock,
-  renderDoc, blockType, slug, tex2mml, texParse, lexTex, renderFlow, emojify,
+  renderDoc, renderUntrusted, setUntrusted, isUntrusted, blockType, slug, tex2mml, texParse, lexTex, renderFlow, emojify,
   EMOJI, MULTILINE, RE_ATX, RE_HR, RE_FENCE, RE_LI, RE_QUOTE, RE_TSEP
 };

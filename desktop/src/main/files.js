@@ -4,6 +4,7 @@
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
+const icloud = require("./icloud");
 
 const MD = /\.(md|markdown|mdown|mkd|txt)$/i;
 const IMG = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
@@ -58,6 +59,23 @@ async function listTree(root, depth = 0, budget = { n: 0 }){
     return a.name.localeCompare(b.name, undefined, { numeric: true });
   });
 
+  /* A note that iCloud has evicted is not present under its own name — macOS
+     leaves a hidden .Notes.md.icloud placeholder in its place. Skipping every
+     dotfile, as we do below, would therefore hide the note completely: the
+     sidebar would simply lose entries as the disk filled up. Collect the
+     placeholders first so those notes can be listed, marked as not downloaded.
+
+     Nothing here reads a file, and nothing here asks iCloud for one. A tree
+     walk over a mostly-evicted vault must not start a download; that is what
+     turns opening a vault into a twenty-gigabyte surprise. */
+  const evicted = new Map();
+  for (const e of entries) {
+    if (e.isDirectory()) continue;
+    const real = icloud.nameFromStub(e.name);
+    if (real && isMarkdown(real)) evicted.set(real, path.join(root, real));
+  }
+
+  const seen = new Set();
   for (const e of entries) {
     if (budget.n > 4000 || depth > 8) break;
     if (e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
@@ -67,8 +85,23 @@ async function listTree(root, depth = 0, budget = { n: 0 }){
       if (kids.length) out.push({ kind: "dir", name: e.name, path: full, children: kids });
     } else if (isMarkdown(e.name)) {
       budget.n++;
+      seen.add(e.name);
       out.push({ kind: "file", name: e.name, path: full });
     }
+  }
+
+  /* Notes that exist only as a placeholder. A stale placeholder beside a real
+     file is ignored — the real file has already been listed. */
+  for (const [name, full] of evicted) {
+    if (seen.has(name) || budget.n > 4000) continue;
+    budget.n++;
+    out.push({ kind: "file", name, path: full, downloaded: false });
+  }
+  if (evicted.size) {
+    out.sort((a, b) => {
+      if ((a.kind === "dir") !== (b.kind === "dir")) return a.kind === "dir" ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
   }
   return out;
 }

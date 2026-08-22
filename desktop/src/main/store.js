@@ -29,19 +29,34 @@ const DEFAULTS = {
   recent: [],
   vault: null,
   session: null,
-  windowBounds: null
+  windowBounds: null,
+  /* Connections to outside sources. Records only: labels, transport config and
+     the tool allowlist. Credentials live in secrets.js, never here — this file
+     is small, rewritten constantly, and the one users paste into bug reports. */
+  connections: []
 };
 
 let cache = null;
 let timer = null;
 
+/* Object.assign copies the array defaults by reference, so a caller that
+   pushed onto settings.recent or settings.connections would be editing
+   DEFAULTS itself and every later load would inherit it. Clone them. */
+function fresh(){
+  const base = Object.assign({}, DEFAULTS);
+  base.recent = [];
+  base.connections = [];
+  return base;
+}
+
 function load(){
   if (cache) return cache;
   try {
-    cache = Object.assign({}, DEFAULTS, JSON.parse(fs.readFileSync(FILE, "utf8")));
+    cache = Object.assign(fresh(), JSON.parse(fs.readFileSync(FILE, "utf8")));
   } catch (err) {
-    cache = Object.assign({}, DEFAULTS);
+    cache = fresh();
   }
+  if (!Array.isArray(cache.connections)) cache.connections = [];
   return cache;
 }
 

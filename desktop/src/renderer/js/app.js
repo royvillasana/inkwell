@@ -16,6 +16,7 @@ import { mountAids, positionTableTools, drawGoal, tableOp, closeSlash } from "./
 import * as V from "./vault.js";
 import * as Rich from "./rich.js";
 import * as Convert from "./convert.js";
+import * as C from "./connections.js";
 import * as Rich9 from "./rich-editor.js";
 
 const api = window.inkju;
@@ -56,7 +57,7 @@ function snapshotDoc(commitFirst){
   const d = docs.find(x => x.id === curDoc);
   if (!d) return;
   Object.assign(d, {
-    text: docText(), name: state.name, path: state.path,
+    text: docText(), name: state.name, path: state.path, remote: state.remote,
     mtime: state.mtime, dirty: state.dirty, scrollTop: $("#scroll").scrollTop
   });
 }
@@ -66,11 +67,11 @@ function adopt(text, name, path, mtime){
   let d = path ? docs.find(x => x.path === path) : null;
   if (d) Object.assign(d, { text, name, mtime, dirty: false });
   else {
-    d = { id: ++docSeq, text, name, path: path || null, mtime: mtime || 0, dirty: false, scrollTop: 0 };
+    d = { id: ++docSeq, text, name, path: path || null, mtime: mtime || 0, dirty: false, scrollTop: 0, remote: null };
     docs.push(d);
   }
   curDoc = d.id;
-  loadText(d.text, d.name, { path: d.path, mtime: d.mtime });
+  loadText(d.text, d.name, { path: d.path, mtime: d.mtime, remote: d.remote });
   if (prefs.rich && Rich9.isReady()) Rich9.setMarkdown(d.text);
   renderTabs();
   V.setActivePath(d.path);
@@ -83,7 +84,7 @@ function switchDoc(id){
   const d = docs.find(x => x.id === id);
   if (!d) return;
   curDoc = id;
-  loadText(d.text, d.name, { path: d.path, mtime: d.mtime });
+  loadText(d.text, d.name, { path: d.path, mtime: d.mtime, remote: d.remote || null });
   state.dirty = d.dirty;
   if (prefs.rich && Rich9.isReady()) Rich9.setMarkdown(d.text);
   renderTabs();
@@ -125,9 +126,16 @@ function renderTabs(){
   docs.forEach(d => {
     const t = document.createElement("button");
     t.className = "tab" + (d.id === curDoc ? " on" : "");
-    t.dataset.tip = d.path || d.name;
+    t.dataset.tip = d.remote ? d.name + " — in " + d.remote.label : (d.path || d.name);
+    if (d.remote) t.classList.add("remote");
     if (d.id === curDoc ? state.dirty : d.dirty) t.appendChild(Object.assign(document.createElement("span"), { className: "dot" }));
     t.appendChild(Object.assign(document.createElement("span"), { className: "nm", textContent: d.name }));
+    /* Where it came from, on the tab itself. A document from someone else's
+       store should never be mistaken for one of your own notes. */
+    if (d.remote) {
+      t.appendChild(Object.assign(document.createElement("span"),
+        { className: "tab-src", textContent: d.remote.label }));
+    }
     const x = document.createElement("span");
     x.className = "cl"; x.textContent = "×";
     x.dataset.tip = "Close tab (⌘W)";
@@ -193,7 +201,137 @@ async function openFileDialog(){
   toast("Opened " + list[list.length - 1].name);
 }
 
+/* Open a document that came from a connection. It behaves like any other tab —
+   the editor, the palette, find, export all work — but it carries a handle to
+   where it came from instead of a path on this disk. */
+function adoptRemote(doc){
+  snapshotDoc();
+  const remote = {
+    connectionId: doc.connectionId,
+    remoteId: doc.remoteId,
+    version: doc.version || null,
+    writable: !!doc.writable,
+    conflictBlind: !!doc.conflictBlind,
+    label: doc.label || C.labelOf(doc.connectionId)
+  };
+  let d = docs.find(x => x.remote && x.remote.connectionId === remote.connectionId
+                      && x.remote.remoteId === remote.remoteId);
+  if (d) Object.assign(d, { text: doc.text, name: doc.name, remote, dirty: false });
+  else {
+    d = { id: ++docSeq, text: doc.text, name: doc.name, path: null, mtime: 0,
+          dirty: false, scrollTop: 0, remote };
+    docs.push(d);
+  }
+  curDoc = d.id;
+  loadText(d.text, d.name, { path: null, mtime: 0, remote });
+  if (prefs.rich && Rich9.isReady()) Rich9.setMarkdown(d.text);
+  renderTabs();
+  updateStatus();
+  toast(d.name + " — from " + remote.label + (remote.writable ? "" : ", read only"));
+  return d;
+}
+
+/* Saving a document that lives somewhere else.
+
+   Three things have to happen that a local save never needs. The connection
+   has to be allowed to write at all; the file has to still be the file we
+   opened; and the user has to have said yes to this particular write, which
+   the main process asks. A connection that cannot tell us whether the file
+   moved is treated as though it always might have. */
+async function saveRemote(){
+  const r = state.remote;
+  const text = docText();
+
+  if (!r.writable) {
+    const ask = await dialog({
+      title: "“" + r.label + "” is read only",
+      message: "Inkju has not been allowed to change files on this connection. " +
+        "You can keep this version as a note in your vault instead.",
+      buttons: [
+        { label: "Cancel", value: "cancel" },
+        { label: "Save a copy to my vault", value: "vault", primary: true }
+      ]
+    });
+    if (ask && ask.action === "vault") return saveRemoteToVault(text);
+    return false;
+  }
+
+  let conflict;
+  try {
+    conflict = await api.cloud.conflict(r.connectionId, r.remoteId, r.version);
+  } catch (err) {
+    /* A connection that has dropped must fail loudly. The tab keeps its text;
+       nothing is lost, and nothing is silently not saved either. */
+    say(err.message, "Could not reach " + r.label);
+    return false;
+  }
+
+  if (conflict.changed === true || conflict.known === false) {
+    const which = await dialog({
+      title: conflict.changed
+        ? "“" + state.name + "” changed in " + r.label
+        : "Save “" + state.name + "” to " + r.label + "?",
+      message: conflict.changed
+        ? "Someone — or another device — has edited this file since you opened it. Inkju will not overwrite it without being told to."
+        : r.label + " cannot tell Inkju whether this file has changed since you opened it, so it asks every time.",
+      buttons: [
+        { label: "Cancel", value: "cancel" },
+        { label: "Save a copy to my vault", value: "vault" },
+        { spacer: true },
+        { label: "Use theirs", value: "theirs" },
+        { label: "Overwrite with mine", value: "mine", primary: true, danger: !!conflict.changed }
+      ]
+    });
+    const pick = which && which.action;
+    if (!pick || pick === "cancel") return false;
+    if (pick === "vault") return saveRemoteToVault(text);
+    if (pick === "theirs") return reloadRemote();
+  }
+
+  let res;
+  try {
+    res = await api.cloud.write(r.connectionId, r.remoteId, text, { name: state.name });
+  } catch (err) { say(err.message, "Save failed"); return false; }
+  if (!res) return false;                      // the user said no at the confirmation
+
+  state.remote = Object.assign({}, r, { version: res.version || null });
+  state.dirty = false;
+  const d = docs.find(x => x.id === curDoc);
+  if (d) Object.assign(d, { dirty: false, remote: state.remote });
+  updateStatus();
+  renderTabs();
+  $("#st-saved").textContent = "saved to " + r.label + " " + fmtTime(Date.now());
+  saveSession();
+  return true;
+}
+
+async function saveRemoteToVault(text){
+  if (!V.vault.root) { say("Open a vault first so the copy has somewhere to go.", "No vault open"); return false; }
+  try {
+    const f = await api.file.create(V.vault.root, state.name, text);
+    toast("Saved " + f.name + " into your vault.");
+    V.refreshVault();
+    /* the tab becomes an ordinary local document from here on */
+    state.remote = null; state.path = f.path; state.name = f.name; state.dirty = false;
+    const d = docs.find(x => x.id === curDoc);
+    if (d) Object.assign(d, { remote: null, path: f.path, name: f.name, dirty: false });
+    renderTabs(); updateStatus();
+    return true;
+  } catch (err) { say(err.message, "Could not save that into your vault"); return false; }
+}
+
+async function reloadRemote(){
+  const r = state.remote;
+  try {
+    const doc = await api.cloud.read(r.connectionId, r.remoteId, null);
+    adoptRemote(Object.assign({}, doc, { label: r.label }));
+    return true;
+  } catch (err) { say(err.message, "Could not reload that file"); return false; }
+}
+
 async function saveDoc(forceDialog){
+  /* A document from a connection has its own path through this. */
+  if (state.remote && !forceDialog) return saveRemote();
   const text = docText();        // no commit: keeps the caret where the user left it
   try {
     if (!forceDialog && state.path) {
@@ -223,6 +361,12 @@ async function saveDoc(forceDialog){
 let autosaveTimer = null;
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
+  /* Never for a document that lives in a connection. Autosaving to a local
+     file is cheap and reversible; autosaving over a network into someone
+     else's store is neither, and a conflict has to be a question rather than
+     something that happened while you were typing. Remote tabs save on ⌘S.
+     (state.path is null for them anyway — this says so on purpose.) */
+  if (state.remote) return;
   if (!prefs.autosave || !state.path || !state.dirty) return;
   autosaveTimer = setTimeout(async () => {
     if (!state.dirty || !state.path) return;
@@ -287,8 +431,17 @@ function updateStatus(){
   $("#st-lines").textContent = text.split("\n").length.toLocaleString();
   $("#st-read").textContent = Math.max(1, Math.round(words / 220));
   /* repainting mid-edit would swallow what is being typed */
-  if (!renamingInline)
-    $("#docname").innerHTML = "<b>" + esc(state.name) + "</b>" + (state.dirty ? ' <span class="dirty">•</span>' : "");
+  if (!renamingInline) {
+    $("#docname").innerHTML = "<b>" + esc(state.name) + "</b>" +
+      (state.remote ? ' <span class="src">in ' + esc(state.remote.label) +
+        (state.remote.writable ? "" : " · read only") + "</span>" : "") +
+      (state.dirty ? ' <span class="dirty">•</span>' : "");
+  }
+  if (state.remote && !$("#st-saved").textContent.startsWith("saved to")) {
+    $("#st-saved").textContent = state.remote.writable
+      ? "⌘S saves to " + state.remote.label
+      : "read only";
+  }
   drawGoal(words);
   buildOutline();
   markTitle();
@@ -584,6 +737,14 @@ function presentKeys(e){
 setInterval(() => { if (state.dirty) api.history.save(state.name, serialize()).catch(() => {}); }, 5 * 60 * 1000);
 
 async function historyDialog(){
+  /* Version history is kept beside the vault, for files in the vault. Showing
+     an empty list for a document that lives in a connection would read as "no
+     history yet" rather than "this is not something Inkju keeps for you". */
+  if (state.remote) {
+    return say("Version history covers the notes in your vault. This document lives in " +
+      state.remote.label + ", which keeps its own versions. Save a copy to your vault to have Inkju track it.",
+      "Not kept for connected files");
+  }
   const list = await api.history.list(state.name).catch(() => []);
   if (!list.length) return say("No snapshots for this note yet. Inkju keeps one every five minutes while you write, and one on every save.", "Version history");
   const pick = await dialog({
@@ -778,6 +939,22 @@ function applyPrefs(){
   $$(".src").forEach(t => { t.spellcheck = !!prefs.spellcheck; });
 }
 
+/* The way into Connections. A button rather than a field, because what is on
+   the other side is a list of things with their own state, not a preference. */
+function connectionsRow(){
+  const wrap = document.createElement("div");
+  wrap.className = "prefs-jump";
+  const b = document.createElement("button");
+  b.className = "side-action";
+  b.textContent = "Connections…";
+  b.onclick = () => { closeModal(null); C.connectionsDialog(); };
+  wrap.appendChild(b);
+  const note = document.createElement("small");
+  note.textContent = "Open notes that live in Google Drive, iCloud Drive, or anywhere else that speaks MCP.";
+  wrap.appendChild(note);
+  return wrap;
+}
+
 async function settingsDialog(){
   const before = JSON.stringify(prefs);
   const r = await dialog({
@@ -806,8 +983,10 @@ async function settingsDialog(){
       { name: "lineNumbers", label: "Line numbers in code blocks", type: "checkbox", value: prefs.lineNumbers },
       { name: "spellcheck", label: "Check spelling while writing", type: "checkbox", value: prefs.spellcheck },
       { name: "checkUpdates", label: "Check GitHub for new versions", type: "checkbox", value: prefs.checkUpdates,
-        hint: "The only network request Inkju makes. Nothing about you or your notes is sent." }
-    ],
+        hint: C.isEnabled()
+          ? "Inkju makes no other network request on its own. Connections you add are the exception, and you choose each one."
+          : "The only network request Inkju makes. Nothing about you or your notes is sent." }
+    ].concat(C.isEnabled() ? [{ type: "node", node: connectionsRow() }] : []),
     buttons: [{ label: "Cancel", value: "cancel" }, { label: "Apply", value: "ok", primary: true }]
   });
   if (!r || r.action !== "ok") { Object.assign(prefs, JSON.parse(before)); applyPrefs(); return; }
@@ -826,6 +1005,24 @@ async function settingsDialog(){
   if (wasActive != null && blockIndex(wasActive) >= 0) activate(wasActive);
   updateStatus();
   savePrefs();
+}
+
+/* Pick a connection to browse. Reached from the palette; the Connections list
+   has its own Browse button beside each one. */
+async function browseConnection(){
+  const all = await api.connections.list();
+  if (!all.length) return C.connectionsDialog();
+  const r = await dialog({
+    title: "Browse",
+    choices: all.map(c => ({
+      value: c.id, label: c.label, icon: "☁",
+      detail: c.status === "connected" ? "connected" : c.status.replace(/-/g, " ")
+    })),
+    buttons: [{ label: "Cancel", value: "cancel" }]
+  });
+  const id = typeof r === "string" ? r : (r && r.value);
+  if (!id || id === "cancel") return;
+  C.startBrowsing(id);
 }
 
 /* ------------------------------------------------------- palette & quick open */
@@ -854,6 +1051,9 @@ const COMMANDS = [
   { name: "Wide layout", key: "", run: () => toggleWide() },
   { name: "Presentation mode", key: "F5", run: () => startPresentation() },
   { name: "Version history…", key: "", run: () => historyDialog() },
+  { name: "Connections…", key: "", run: () => C.connectionsDialog(), when: () => C.isEnabled() },
+  { name: "Browse a connection…", key: "", run: () => browseConnection(), when: () => C.isEnabled() },
+  { name: "Back to the vault", key: "", run: () => C.stopBrowsing(), when: () => !!C.browsingId() },
   { name: "Preferences…", key: "⌘,", run: () => settingsDialog() },
   { name: "Toggle sidebar", key: "⌘\\", run: () => toggleSidebar() },
   { name: "Outline", key: "", run: () => { toggleSidebar(true); setPane("outline"); } },
@@ -893,7 +1093,7 @@ async function fillPalette(q){
     if (!palList.length) palList = [{ name: V.vault.root ? "No note matches" : "Open a vault first", run: () => V.openVaultDialog() }];
   } else {
     const s = q.toLowerCase();
-    palList = COMMANDS.filter(c => c.name.toLowerCase().includes(s));
+    palList = COMMANDS.filter(c => (!c.when || c.when()) && c.name.toLowerCase().includes(s));
   }
   palSel = 0;
   list.textContent = "";
@@ -1063,7 +1263,18 @@ function saveSession(){
   clearTimeout(sessionTimer);
   sessionTimer = setTimeout(() => {
     snapshotDoc(false);
-    const session = docs.map(d => ({
+    /* Documents that live in a connection are not part of the session.
+
+       Two reasons, and either one is enough. Keeping them would write the
+       contents of somebody's Drive file into settings.json — a plain file on
+       this disk — which is the opposite of what the rest of this feature is
+       for. And restoring one would produce a tab that looks like a note but
+       has no path and no connection behind it: the next ⌘S would offer to save
+       it to disk as though it had always been local.
+
+       So a remote tab lasts as long as the window does. Reopen it from the
+       connection, where it actually lives. */
+    const session = docs.filter(d => !d.remote).map(d => ({
       path: d.path,
       name: d.name,
       text: d.path && !d.dirty ? null : d.text.slice(0, 400000),
@@ -1092,7 +1303,7 @@ async function restoreSession(session){
   if (!restored) return false;
   curDoc = activeId || docs[0].id;
   const d = docs.find(x => x.id === curDoc);
-  loadText(d.text, d.name, { path: d.path, mtime: d.mtime });
+  loadText(d.text, d.name, { path: d.path, mtime: d.mtime, remote: d.remote || null });
   state.dirty = d.dirty;
   renderTabs();
   V.setActivePath(d.path);
@@ -1135,6 +1346,8 @@ const MENU = {
   "typewriter": () => toggleTypewriter(),
   "present": () => startPresentation(),
   "history": () => historyDialog(),
+  "connections": () => C.connectionsDialog(),
+  "browse-connection": () => browseConnection(),
   "next-tab": () => cycleTab(1),
   "prev-tab": () => cycleTab(-1),
   "help": () => showHelp(),
@@ -1402,6 +1615,18 @@ function wireUI(){
   $("#btn-save").onclick = () => saveDoc(false);
   $("#vault-bar").onclick = () => V.vaultMenu($("#vault-bar"));
   V.setToast(toast);
+
+  /* Connections. init() answers false in a build without the feature, and
+     nothing below it runs — no list is loaded, no status is subscribed to. */
+  C.setToast(toast);
+  C.setRemoteOpener(doc => adoptRemote(doc));
+  C.init().catch(() => {});
+
+  /* An iCloud note may have to be fetched before it can be opened. Say so:
+     without this the app simply stops responding for as long as the download
+     takes, which reads as a crash rather than as a download. */
+  api.on.icloudDownloading(e => toast("Downloading " + e.name + " from iCloud…"));
+
   /* A renamed vault moves every file inside it. Repoint open tabs before the
      next autosave fires, or it would write to the old path and recreate the
      file in a folder that no longer exists. */

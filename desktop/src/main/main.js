@@ -44,8 +44,18 @@ const search = require("./search");
 const { buildMenu } = require("./menu");
 const updates = require("./updates");
 const pandoc = require("./pandoc");
+const connections = require("./connections");
+const mcp = require("./mcp-client");
+const oauth = require("./oauth");
+const icloud = require("./icloud");
+const cloud = require("./cloud");
 
 const isDev = process.argv.includes("--dev");
+/* Connections — the MCP host and the cloud browser — ship dark until the OAuth
+   flow has been exercised against real accounts. Everything the feature adds is
+   gated on this one flag, so a build without it behaves exactly as 2.2.0 did:
+   no connection is loaded, no token is refreshed, nothing is spawned. */
+const connectionsEnabled = process.argv.includes("--connections") || !!process.env.INKJU_CONNECTIONS;
 const windows = new Set();
 let watcher = null;
 let watchTimer = null;
@@ -111,7 +121,16 @@ function createWindow(openPath){
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (e, url) => {
-    if (!url.startsWith("file://")) { e.preventDefault(); shell.openExternal(url); }
+    if (url.startsWith("file://")) return;
+    e.preventDefault();
+    /* Only the web. This used to hand anything that was not file:// straight to
+       the operating system, which was fine while every document came off the
+       user's own disk — and is not fine now that a note can arrive from someone
+       else's Drive. javascript:, data:, smb: and whatever scheme some other
+       installed application has registered are all things a note should not be
+       able to reach through us. Matches setWindowOpenHandler, which was already
+       strict about this. */
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
   });
 
   const remember = () => { if (!win.isDestroyed() && !win.isFullScreen()) store.save({ windowBounds: win.getBounds() }); };
@@ -306,15 +325,68 @@ handle("vault:quickOpen", q => search.quickOpen(q));
 handle("vault:reindex", () => search.build());
 
 handle("file:read", async p => {
-  const d = await files.readText(p);
+  /* Opening a note is the one moment iCloud is allowed to fetch: an explicit
+     act by the user, on one file. The renderer is told first, so a download
+     over a slow connection reads as "downloading" rather than as a frozen app.
+     Nothing else in the app takes this path — the tree walk and the indexer
+     both step around evicted files entirely. */
+  const d = await icloud.readWithMaterialize(
+    p,
+    file => files.readText(file),
+    name => broadcast("icloud:downloading", { path: p, name }));
   store.addRecent({ path: p, name: path.basename(p) });
   return { path: p, name: path.basename(p), text: d.text, mtime: d.mtime };
 });
 
 handle("file:write", async (p, text) => {
+  /* A note open in a tab can be evicted underneath the app. Writing then would
+     land the file beside its own placeholder and leave iCloud with two ideas
+     about what the note is, so it is fetched back first. */
+  await icloud.prepareForWrite(p);
   const res = await files.writeText(p, text);
   await search.touch(p);
   return { path: p, name: path.basename(p), mtime: res.mtime };
+});
+
+/* iCloud Drive as a place to keep a vault. Not a connection, not an account —
+   a folder that syncs, offered beside the connections so the idea stays in one
+   place. Absent off macOS and absent when iCloud Drive is switched off. */
+handle("icloud:info", async () => {
+  const base = icloud.root();
+  if (!base) return null;
+  const vault = store.get().vault;
+  return { root: base, vaultIsInside: !!vault && icloud.isInside(vault) };
+});
+
+handle("icloud:openVault", async () => {
+  const base = icloud.root();
+  if (!base) throw new Error("iCloud Drive is not set up on this Mac.");
+  const r = await dialog.showOpenDialog(focused(), {
+    title: "Open a Vault in iCloud Drive",
+    defaultPath: base,
+    properties: ["openDirectory", "createDirectory"]
+  });
+  if (r.canceled) return null;
+  const root = r.filePaths[0];
+  if (!icloud.isInside(root)) {
+    throw new Error("That folder is not in iCloud Drive. Open it as an ordinary vault instead.");
+  }
+  store.save({ vault: root });
+  await search.setRoot(root);
+  watchVault(root);
+  return { root, tree: await files.listTree(root), stats: search.stats() };
+});
+
+/* Which notes in this folder have a conflicting copy. Reported, never fixed:
+   iCloud keeps both sides and choosing between them is the user's call. */
+handle("icloud:conflicts", async dir => {
+  const target = dir || store.get().vault;
+  if (!target || !icloud.isInside(target)) return [];
+  let names;
+  try { names = await fsp.readdir(target); }
+  catch (err) { return []; }
+  const map = icloud.findConflicts(names);
+  return Array.from(map.entries()).map(([of, copies]) => ({ of, copies }));
 });
 
 handle("file:saveAs", async (suggested, text) => {
@@ -512,6 +584,192 @@ handle("confirm", async opts => {
   return r.response;
 });
 
+/* ------------------------------------------------------------ connections */
+
+/* Every handler below is gated on the flag. A build without --connections is
+   not a build where these fail politely; it is a build where the renderer is
+   told the feature is not here, so nothing loads, nothing connects, and no
+   token is refreshed. */
+function requireConnections(){
+  if (!connectionsEnabled) throw new Error("Connections are not enabled in this build.");
+}
+
+/* The renderer is told what a connection needs, never how to satisfy it. */
+mcp.setAuthProviderFactory(rec => oauth.makeProvider(rec, {
+  /* A provider built outside an interactive flow has no loopback listener and
+     no state: it exists so a stored token can be replayed and refreshed
+     silently. Anything that would need the browser throws instead, and the
+     connection is marked as needing authorization. */
+  redirectUrl: undefined,
+  state: null
+}));
+
+mcp.setReauthorizer(async (id, scope) => authorizeConnection(id, scope));
+
+/* One interactive sign-in, then a connection on a fresh transport. A started
+   transport cannot be restarted, which is why the flow builds its own and this
+   throws the first one away. */
+async function authorizeConnection(id, scope){
+  requireConnections();
+  const rec = connections.raw(id);
+  if (rec.transport !== "http") throw new Error("Only server connections sign in. A local one takes its credentials from its environment.");
+
+  connections.setStatus(id, connections.STATUS.CONNECTING);
+  try {
+    const flow = await oauth.authorize(rec, {
+      /* a step-up scope, if this is one — not stored, just used here */
+      build: opts => new (require("@modelcontextprotocol/sdk/client/streamableHttp.js").StreamableHTTPClientTransport)(
+        new URL(rec.config.url), { authProvider: opts.authProvider, scope: scope || undefined }),
+      connect: async transport => {
+        const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
+        const probe = new Client({ name: "inkju", version: app.getVersion() }, { capabilities: {} });
+        await probe.connect(transport);
+        await probe.close();
+      },
+      finish: (transport, code) => transport.finishAuth(code)
+    }, { scope: scope || null });
+    try { await flow.transport.close(); } catch (err) { /* already gone */ }
+    connections.setStatus(id, connections.STATUS.DISCONNECTED);
+    return await mcp.connect(id);
+  } catch (err) {
+    connections.setStatus(id, connections.STATUS.NEEDS_AUTH, mcp.scrub(err.message));
+    throw new Error(mcp.scrub(err.message));
+  }
+}
+
+handle("connections:enabled", () => connectionsEnabled);
+
+/* Presets are data, so a change to Google's preview server is a change to a
+   JSON file rather than to a release. */
+handle("connections:presets", () => {
+  if (!connectionsEnabled) return [];
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, "presets", "connections.json"), "utf8");
+    return JSON.parse(raw).presets || [];
+  } catch (err) {
+    console.warn("connections: presets unreadable:", err.message);
+    return [];
+  }
+});
+
+/* The cloud browser. Everything below is a connection doing the work; the
+   renderer only ever sees rows and text. */
+handle("cloud:capabilities", id => { requireConnections(); return cloud.capabilities(id); });
+handle("cloud:list", (id, opts) => { requireConnections(); return cloud.listFiles(id, opts || {}); });
+handle("cloud:read", (id, remoteId, entry) => { requireConnections(); return cloud.readFile(id, remoteId, entry || null); });
+handle("cloud:conflict", (id, remoteId, version) => { requireConnections(); return cloud.checkForConflict(id, remoteId, version); });
+
+/* A write is the one place the user is asked directly. The allowlist has
+   already said the tool may be used; this asks whether it may be used now, on
+   this file. "Don't ask again" is per connection, off by default, and a
+   deletion is never covered by it. */
+async function confirmRemoteChange(rec, what, name){
+  const destructive = what === "delete";
+  if (!destructive && rec.confirmWrites === false) return true;
+  const r = await dialog.showMessageBox(focused(), {
+    type: destructive ? "warning" : "question",
+    buttons: ["Cancel", destructive ? "Delete" : "Save"],
+    defaultId: 1,
+    cancelId: 0,
+    message: destructive
+      ? "Delete “" + name + "” from " + rec.label + "?"
+      : "Save “" + name + "” to " + rec.label + "?",
+    detail: destructive
+      ? "This removes the file from the connected account. Inkju cannot undo it."
+      : "This writes the file in the connected account, replacing what is there now."
+  });
+  return r.response === 1;
+}
+
+handle("cloud:write", async (id, remoteId, text, opts) => {
+  requireConnections();
+  const rec = connections.raw(id);
+  const o = opts || {};
+  if (!await confirmRemoteChange(rec, "write", o.name || remoteId)) return null;
+  return cloud.writeFile(id, remoteId, text, o);
+});
+
+handle("cloud:import", async (id, remoteId, entry) => {
+  requireConnections();
+  const dir = (entry && entry.dir) || store.get().vault;
+  const f = await cloud.importToVault(id, remoteId, dir, entry || null);
+  await search.touch(f.path);
+  return f;
+});
+
+handle("connections:list", () => {
+  if (!connectionsEnabled) return [];
+  return connections.list();
+});
+
+handle("connections:get", id => { requireConnections(); return connections.get(id); });
+
+handle("connections:add", input => { requireConnections(); return connections.add(input); });
+
+handle("connections:update", (id, patch) => { requireConnections(); return connections.update(id, patch); });
+
+/* Secrets travel on their own channel, one at a time, and go straight into the
+   credential store. They are never part of a connection record, so they cannot
+   come back out on connections:get. */
+handle("connections:setSecret", async (id, key, value) => {
+  requireConnections();
+  const allowed = ["client_id", "client_secret"];
+  const name = String(key);
+  const ok = allowed.includes(name) || /^env:[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+  if (!ok) throw new Error("That is not a credential Inkju stores.");
+  const r = await secretsFor(id, name, value);
+  return { stored: r.stored };
+});
+
+async function secretsFor(id, key, value){
+  const secrets = require("./secrets");
+  connections.raw(id);                       // throws if it does not exist
+  return secrets.set(id, key, value);
+}
+
+/* Which credentials a connection has, by name. Never a value. */
+handle("connections:secretKeys", async id => {
+  requireConnections();
+  const secrets = require("./secrets");
+  connections.raw(id);
+  return secrets.keys(id);
+});
+
+handle("connections:remove", async id => {
+  requireConnections();
+  return connections.remove(id, cid => mcp.disconnect(cid));
+});
+
+handle("connections:connect", async id => {
+  requireConnections();
+  const rec = connections.raw(id);
+  try {
+    return await mcp.connect(id);
+  } catch (err) {
+    /* An HTTP connection that needs authorization is a question, not a fault:
+       answer it by running the flow rather than making the user find a button
+       they have not been shown yet. */
+    if (err.needsAuthorization && rec.transport === "http") return authorizeConnection(id);
+    throw err;
+  }
+});
+
+handle("connections:authorize", id => { requireConnections(); return authorizeConnection(id); });
+
+handle("connections:disconnect", id => { requireConnections(); return mcp.disconnect(id); });
+
+/* What the allowlist editor should propose for a freshly connected server. */
+handle("connections:proposeAllow", (id, needs) => {
+  requireConnections();
+  return connections.proposeAllow(id, needs);
+});
+
+/* Status and tool-surface changes are pushed rather than polled, so a
+   connection that drops updates the interface without anyone asking. */
+connections.events.on("status", e => broadcast("connections:status", e));
+connections.events.on("changed", e => broadcast("connections:changed", e));
+connections.events.on("tools-appeared", e => broadcast("connections:tools-appeared", e));
+
 handle("theme:system", () => nativeTheme.shouldUseDarkColors);
 nativeTheme.on("updated", () => broadcast("theme:changed", nativeTheme.shouldUseDarkColors));
 
@@ -548,5 +806,7 @@ else {
   });
 
   app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
-  app.on("before-quit", () => store.flush());
+  /* Child processes and sockets do not outlive the app. Without this a stdio
+     server keeps running after the window closes, holding the vault open. */
+  app.on("before-quit", () => { store.flush(); mcp.disconnectAll().catch(() => {}); });
 }

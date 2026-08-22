@@ -23,6 +23,7 @@ function buildMenu(handlers){
       { role: "about" },
       { type: "separator" },
       item("Preferences…", "Cmd+,", "prefs"),
+      item("Connections…", null, "connections"),
       { type: "separator" },
       { role: "services" }, { type: "separator" },
       { role: "hide" }, { role: "hideOthers" }, { role: "unhide" },
@@ -38,6 +39,7 @@ function buildMenu(handlers){
       { type: "separator" },
       item("Open File…", "CmdOrCtrl+O", "open"),
       item("Open Folder as Vault…", "CmdOrCtrl+Shift+O", "open-vault"),
+      item("Browse a Connection…", null, "browse-connection"),
       {
         label: "Open Recent",
         submenu: recent.length

@@ -14,7 +14,7 @@ Everything here is derived from two files you supplied, kept at the repo root:
 |---|---|
 | `icon-master-1010.png` | the icon exactly as cut, corners transparent |
 | `icon-rounded-1024.png` | the same at 1024, full bleed — the source for web and iOS |
-| `macos/icon-1024.png` | the icon at 824px on a 1024 canvas, Apple's macOS grid |
+| `macos/icon-1024.png` | the icon at full bleed on a 1024 canvas — see below |
 
 ## macOS — `macos/`
 
@@ -23,8 +23,21 @@ Everything here is derived from two files you supplied, kept at the repo root:
 upscale. `icon.icns` and `icon-1024.png` are copied to `desktop/build/`, which
 is where electron-builder picks them up.
 
-The .icns is ~6 MB. Brushed metal is noise, and noise does not compress; that
-is the price of this artwork rather than a mistake.
+**Full bleed, not inset.** These used to be the artwork at 824px on a 1024
+canvas — the classic macOS grid, which left 100px of transparent margin on
+every side. macOS 26 draws its own light rounded-square plate behind an app
+icon, so that margin stopped being empty space and became a pale ring around
+the artwork: the icon read as a small tile floating inside a thick white
+stroke, and the feather lost about a quarter of its size for nothing.
+
+So the art now fills the canvas. It can, because it is already a rounded square
+at roughly the system's own corner radius — its corners land where the mask
+expects them, and there is no gap for the plate to show through. The .icns fell
+from 6.5 MB to 2.9 MB in the process, which is the padding no longer being
+stored ten times over.
+
+The .icns is still ~3 MB. Brushed metal is noise, and noise does not compress;
+that is the price of this artwork rather than a mistake.
 
 ## iOS — `ios/`
 
@@ -60,3 +73,6 @@ These are copied into `docs/assets/` and referenced from `docs/index.html` and
 The whole set comes from the two source files with ImageMagick and `iconutil`.
 The one number to keep is the crop: `1010x1010+904+259` of `app_icon.jpeg`,
 with a corner radius of 222 at that size.
+
+Every macOS size is a straight Lanczos resize of `icon-rounded-1024.png` with
+no inset — if you reintroduce a margin, the plate comes back as a ring.

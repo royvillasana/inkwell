@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Connection presets. Deliberately data rather than code: Google's Drive MCP",
+    "server is in the Workspace Developer Preview Program, and its address,",
+    "scopes and tool names can change without asking us. When they do, this file",
+    "changes and nobody needs a new build of Inkju.",
+    "",
+    "Inkju ships no OAuth client of its own. A client secret inside a downloaded",
+    "desktop app is not a secret, so the user brings their own — the same way",
+    "Claude Desktop's custom connectors work."
+  ],
+  "presets": [
+    {
+      "id": "google-drive",
+      "label": "Google Drive",
+      "transport": "http",
+      "blurb": "Open the markdown files in your Google Drive.",
+      "config": {
+        "url": "https://drivemcp.googleapis.com/mcp/v1",
+        "scopes": [
+          "https://www.googleapis.com/auth/drive.readonly",
+          "https://www.googleapis.com/auth/drive.file"
+        ]
+      },
+      "needs": ["clientId", "clientSecret"],
+      "propose": ["search_files", "read_file_content", "get_file_metadata", "list_recent_files"],
+      "setup": {
+        "heading": "Google Drive needs an OAuth client of your own",
+        "why": "Inkju does not ship one. A client secret inside an app anyone can download is not a secret, so this stays yours — nothing about your Drive passes through us.",
+        "steps": [
+          "Open the Google Cloud console and create a project, or pick one you already have.",
+          "Enable the Google Drive API for it.",
+          "Configure the OAuth consent screen, adding yourself as a test user.",
+          "Create an OAuth client ID of type Desktop app.",
+          "Copy the client ID and client secret into the two boxes below."
+        ],
+        "link": "https://console.cloud.google.com/apis/credentials",
+        "linkLabel": "Google Cloud credentials",
+        "caveat": "Google's Drive MCP server is part of the Workspace Developer Preview Program. It can change, and it may not be available to every account yet."
+      }
+    }
+  ]
+}
